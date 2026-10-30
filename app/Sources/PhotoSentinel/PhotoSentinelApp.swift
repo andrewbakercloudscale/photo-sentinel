@@ -116,7 +116,7 @@ struct ContentView: View {
         .sheet(isPresented: Binding(get: { !model.onboarded }, set: { if !$0 { model.onboarded = true } })) {
             OnboardingView(model: model)
         }
-        .sheet(item: $model.removing) { r in RemovalSheet(model: model, recipe: r) }
+        .sheet(item: $model.removing) { r in RemovalSheet(model: model, base: r) }
         .sheet(item: $model.statDetail) { s in StatDetailSheet(model: model, stat: s) }
     }
 

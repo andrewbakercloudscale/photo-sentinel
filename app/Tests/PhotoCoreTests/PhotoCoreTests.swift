@@ -95,6 +95,35 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(s.proxies, 2)
     }
 
+    /// "The oldest 5 GB" and "everything up to 18 months" for this one removal, setting untouched.
+    func testAScopeTakesTheOldestFirstAndBecomesAnAge() throws {
+        let db = try makeDB()
+        let wa = "net.whatsapp.WhatsApp"
+        try insert(db, 1, file: "a", bundle: wa, at: "2020-01-10T09:00:00Z", bytes: 100)
+        try insert(db, 2, file: "b", bundle: wa, at: "2021-01-10T09:00:00Z", bytes: 200)
+        try insert(db, 3, file: "c", bundle: wa, at: "2022-01-10T09:00:00Z", bytes: 300)
+        try insert(db, 4, file: "d", bundle: wa, at: "2023-01-10T09:00:00Z", bytes: 400)
+        try insert(db, 5, file: "z", bundle: wa, at: "2019-01-10T09:00:00Z", bytes: 5000, present: 0)  // gone: never counted
+        let now = ISO8601DateFormatter().date(from: "2026-10-25T00:00:00Z")!
+        let base = Recipe(kind: .whatsapp, age: Age(1, "y"))
+        func selected(_ s: Scope) throws -> Tally {
+            try Ledger.stats(db, Ledger.scoped(db, base, s, now: now), now: now).selected
+        }
+
+        XCTAssertEqual(try selected(Scope()), Tally(count: 4, bytes: 1000))
+        XCTAssertEqual(try selected(Scope(amount: .bytes(250))), Tally(count: 2, bytes: 300), "the oldest until 250 is reached, the one reaching it included")
+        XCTAssertEqual(try selected(Scope(amount: .bytes(300))), Tally(count: 2, bytes: 300))
+        XCTAssertEqual(try selected(Scope(amount: .percent(50))), Tally(count: 3, bytes: 600))
+        XCTAssertEqual(try selected(Scope(amount: .bytes(99_999))), Tally(count: 4, bytes: 1000), "more than there is: all of it")
+        XCTAssertEqual(try selected(Scope(age: Age(5, "y"))), Tally(count: 2, bytes: 300), "an age other than the setting")
+        XCTAssertEqual(try selected(Scope(age: Age(5, "y"), amount: .bytes(50))), Tally(count: 1, bytes: 100), "both: the oldest within that age")
+        XCTAssertEqual(base.age, Age(1, "y"), "the clean-up itself is unchanged")
+
+        let custom = Recipe(custom: Filter(name: "Mine", source: "whatsapp", olderThan: "1y"))
+        XCTAssertEqual(custom.withAge(Age(4, "y")).filter.olderThan, "4y")
+        XCTAssertEqual(custom.withAge(Age(4, "y")).title, "Mine")
+    }
+
     func testBreakdownCutsEverythingAndASelectionTheSameWays() throws {
         let db = try makeDB()
         try insert(db, 1, file: "a", bundle: "net.whatsapp.WhatsApp", at: "2019-03-01T00:00:00Z", bytes: 100, cloud: "CLOUD_VERIFIED")

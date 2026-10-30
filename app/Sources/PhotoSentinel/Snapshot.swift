@@ -43,7 +43,7 @@ enum Snapshot {
             }
         }
         for recipe in model.recipes {
-            let r = ImageRenderer(content: RemovalSheet(model: model, recipe: recipe, scrolls: false).frame(height: 1100))
+            let r = ImageRenderer(content: RemovalSheet(model: model, base: recipe, scrolls: false).frame(height: 1100))
             r.scale = 1
             if let img = r.nsImage, let tiff = img.tiffRepresentation,
                let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {

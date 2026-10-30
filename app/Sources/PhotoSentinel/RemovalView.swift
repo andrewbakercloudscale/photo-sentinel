@@ -8,7 +8,8 @@ import SwiftUI
 /// or the app, never stops a step; reopening shows where it got to.
 struct RemovalSheet: View {
     @ObservedObject var model: Model
-    let recipe: Recipe
+    /// The clean-up as the owner set it up; `recipe` is it narrowed to this time's scope.
+    let base: Recipe
     /// ImageRenderer draws nothing inside a ScrollView, so `--snapshot` turns it off.
     var scrolls = true
     @State private var typed = ""
@@ -18,7 +19,13 @@ struct RemovalSheet: View {
     /// An audit counts for six hours: long enough to plan and remove after it, short
     /// enough that a Drive change since is unlikely. The removal re-checks Drive anyway.
     private static let auditLife: TimeInterval = 6 * 3600
-    private var stats: RecipeStats? { model.library?.recipes.first { $0.id == recipe.id } }
+    /// This time only: an age other than the setting, or just the oldest part.
+    @State private var scope = Scope()
+    @State private var scoped: (recipe: Recipe, stats: RecipeStats)?
+    private var recipe: Recipe { scope.isDefault ? base : scoped?.recipe ?? base }
+    private var stats: RecipeStats? {
+        scope.isDefault ? model.library?.recipes.first { $0.id == base.id } : scoped?.stats
+    }
     private var audit: TaskStatus? { model.latest(.audit) }
     private var lastRemoval: TaskStatus? { model.latest(.remove, recipe: recipe) }
     /// A removal that had already finished when the sheet opened. The sheet starts from a
@@ -43,7 +50,7 @@ struct RemovalSheet: View {
                 SymbolTile(symbol: recipe.symbol, color: Tab.cleanUp.color, size: 40)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(recipe.title).font(.title2.weight(.bold))
-                    Text(recipe.detail).font(.callout).foregroundStyle(.secondary)
+                    Text(base.detail).font(.callout).foregroundStyle(.secondary)
                 }
                 Spacer()
                 CapsuleButton(title: "Close", symbol: "xmark", color: Theme.bad) { model.removing = nil }
@@ -57,6 +64,8 @@ struct RemovalSheet: View {
         .frame(minWidth: 620, idealWidth: 720, maxWidth: .infinity, minHeight: 520, idealHeight: 760, maxHeight: .infinity)
         .background(Color(light: "#f5f5f7", dark: "#1c1c1f"))
         .onChange(of: removal?.running) { loadProof() }
+        .task(id: scope) { await rescope() }
+        .onChange(of: recipe) { routes = loadRoutes() }
         .onChange(of: model.storage?.destinations) { routes = loadRoutes() }
         .onAppear {
             if let r = lastRemoval, !r.running, r.errorMessage == nil { spent = r.task.id }
@@ -67,12 +76,25 @@ struct RemovalSheet: View {
     private var steps: some View {
         VStack(alignment: .leading, spacing: 14) {
             WhereTheyGo(model: model, routes: routes ?? loadRoutes())
+            ScopeCard(base: base, scope: $scope, scoped: scope.isDefault ? nil : scoped?.recipe, stats: stats,
+                      locked: removal?.running == true)
             backupStep
             driveStep
             removeStep
             proofStep
         }
         .padding(18)
+    }
+
+    private func rescope() async {
+        guard !scope.isDefault else { scoped = nil; return }
+        let (path, base, scope) = (model.ledgerPath, base, scope)
+        let result = await Task.detached { () -> (Recipe, RecipeStats)? in
+            let db = try? SQLiteReader(path: path)
+            guard let db, let r = try? Ledger.scoped(db, base, scope), let st = try? Ledger.stats(db, r) else { return nil }
+            return (r, st)
+        }.value
+        if let result { scoped = (result.0, result.1) }
     }
 
     // MARK: 1. Back up whatever is not in Drive yet
@@ -457,5 +479,80 @@ struct ProofTable: View {
                 if proof.rows.count < proof.total { Text("Showing the latest \(Fmt.count(proof.rows.count)).").font(.caption).foregroundStyle(.secondary) }
             }
         }
+    }
+}
+
+/// This time only: an age other than the setting, or just the oldest part ("the oldest
+/// 5 GB"). Backup, plan and removal all follow it; the setting itself stays as it is.
+struct ScopeCard: View {
+    let base: Recipe
+    @Binding var scope: Scope
+    /// The clean-up narrowed to the scope, once counted.
+    let scoped: Recipe?
+    let stats: RecipeStats?
+    var locked = false
+    @State private var gb = ""
+
+    private static let gbBytes: Int64 = 1_073_741_824
+    static let ages = ["30d", "90d", "6m", "1y", "18m", "2y", "3y", "5y"].compactMap { Age($0) }
+    static let amounts: [(Scope.Amount, String)] =
+        [(.all, "All of it")] + [1, 2, 5, 10, 20, 50].map { (.bytes(Int64($0) * gbBytes), "The oldest \($0) GB") }
+        + [25, 50, 75].map { (.percent($0), "The oldest \($0)%") }
+
+    private var setting: Age? { base.age ?? base.filter.olderThan.flatMap { Age($0) } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "slider.horizontal.3").foregroundStyle(Tab.cleanUp.color)
+                Text("This time").font(.headline)
+                Spacer()
+                if !scope.isDefault {
+                    Button("Back to my setting") { scope = Scope(); gb = "" }.buttonStyle(.link)
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Taken more than", selection: $scope.age) {
+                    Text("\(setting?.words ?? "any age") ago (my setting)").tag(Age?.none)
+                    ForEach(Self.ages.filter { $0 != setting }, id: \.self) { Text("\($0.words) ago").tag(Optional($0)) }
+                }
+                .fixedSize()
+                Picker("How much", selection: $scope.amount) {
+                    ForEach(Self.amounts, id: \.0) { Text($0.1).tag($0.0) }
+                    if case .bytes(let b) = scope.amount, !Self.amounts.contains(where: { $0.0 == scope.amount }) {
+                        Text("The oldest \(Fmt.bytes(b))").tag(scope.amount)
+                    }
+                }
+                .fixedSize()
+                HStack(spacing: 4) {
+                    Text("Or type an amount: the oldest").foregroundStyle(.secondary)
+                    TextField("5", text: $gb).frame(width: 50).multilineTextAlignment(.trailing)
+                        .onSubmit(applyGB)
+                    Text("GB").foregroundStyle(.secondary)
+                    Button("Use", action: applyGB).disabled(Double(gb.replacingOccurrences(of: ",", with: ".")) == nil)
+                }
+                .fixedSize()
+            }
+            .font(.callout)
+            Text(summary).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+        .disabled(locked)
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardFill))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Tab.cleanUp.color.opacity(0.5), lineWidth: 1.5))
+    }
+
+    private func applyGB() {
+        guard let v = Double(gb.replacingOccurrences(of: ",", with: ".")), v > 0 else { return }
+        scope.amount = .bytes(Int64(v * Double(Self.gbBytes)))
+    }
+
+    private var summary: String {
+        guard let stats else { return "Counting…" }
+        let covers = "Covers \(Fmt.count(stats.selected.count)) items (\(Fmt.bytes(stats.selected.bytes)))"
+        if scope.isDefault { return covers + ", as your setting says. Change it here for this time only." }
+        let before = scoped?.age.map { $0.cutoff() } ?? scoped?.filter.olderThan.flatMap { Age($0)?.cutoff() }
+        let taken = before.flatMap { Fmt.dateOnly($0) }.map { ", taken before \($0)" } ?? ""
+        return covers + taken + ". This time only: your setting stays \(setting?.words ?? "any age")."
     }
 }
