@@ -8,6 +8,7 @@ struct MediaCharts: View {
     @ObservedObject var model: Model
     @AppStorage("timelineUnit") private var unit: TimeUnit = .year
     @AppStorage("timelineSpan") private var span: TimeSpan = .all
+    @AppStorage("timelineSplit") private var split: TimeSplit = .source
 
     /// The bars for the chosen unit and span. The span counts back from today, so an
     /// empty recent month still has a place.
@@ -38,7 +39,7 @@ struct MediaCharts: View {
                         Text(model.draft.summary).font(.body.weight(.semibold))
                         Donuts(b: sel, onSource: nil)
                         Text("OVER TIME").sectionLabel().padding(.top, 4)
-                        Timeline(all: periods(sel), label: unit == .year ? { $0 } : Self.shortMonth, onPick: nil)
+                        Timeline(all: periods(sel), split: split, label: unit == .year ? { $0 } : Self.shortMonth, onPick: nil)
                     }
                 } else {
                     Text("Nothing on the phone matches these filters.").font(.callout).foregroundStyle(.secondary)
@@ -48,7 +49,11 @@ struct MediaCharts: View {
                 Card(title: "Over time", symbol: "calendar", tint: Tab.library.color,
                      trailing: AnyView(TimeControls(unit: $unit, span: $span))) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Timeline(all: periods(all), label: unit == .year ? { $0 } : Self.shortMonth) { p in
+                        Picker("Show", selection: $split) {
+                            ForEach(TimeSplit.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented).fixedSize()
+                        Timeline(all: periods(all), split: split, label: unit == .year ? { $0 } : Self.shortMonth) { p in
                             model.draft.year = Int(p.prefix(4))
                             model.openBuilder()
                         }
@@ -104,6 +109,12 @@ struct MediaCharts: View {
 }
 
 enum TimeUnit: String, CaseIterable { case year, month }
+
+/// What the bars over time are split by.
+enum TimeSplit: String, CaseIterable {
+    case source, kind, drive
+    var title: String { switch self { case .source: "What's using it"; case .kind: "Photo or video"; case .drive: "Google Drive" } }
+}
 
 enum TimeSpan: String, CaseIterable {
     case all, five, two, one
@@ -216,23 +227,62 @@ struct Donut: View {
     }
 }
 
-/// Stacked bars of what is in Drive and what is not.
+/// Stacked bars, split by source, by kind, or by what is in Google Drive and what is not.
 private struct Timeline: View {
     let all: [Breakdown.Period]
+    let split: TimeSplit
     let label: (String) -> String
     let onPick: ((String) -> Void)?
+    @State private var hovered: String?
+
+    /// One stacked piece of one bar.
+    private struct Piece: Identifiable {
+        let period: String
+        let series: String
+        let tally: Tally
+        var id: String { period + "|" + series }
+    }
+
+    /// The series, biggest overall first, with their titles and colours.
+    private var series: [(key: String, title: String, color: Color)] {
+        switch split {
+        case .drive:
+            return [("in", "In Google Drive", Theme.good), ("out", "Not in Google Drive yet", Theme.warn)]
+        case .source:
+            return order(\.bySource).map { k in
+                let c = Channel(rawValue: k) ?? .unattributed
+                return (k, c.title, Theme.color(c))
+            }
+        case .kind:
+            let titles = ["photo": "Photos", "live": "Live Photos", "video": "Videos", "screenshot": "Screenshots"]
+            return order(\.byKind).map { ($0, titles[$0] ?? $0, Donuts.kindColor($0)) }
+        }
+    }
+
+    private func order(_ path: KeyPath<Breakdown.Period, [String: Tally]>) -> [String] {
+        var sums: [String: Int64] = [:]
+        for p in all { for (k, t) in p[keyPath: path] { sums[k, default: 0] += t.bytes } }
+        return sums.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+    }
+
+    private func tally(_ p: Breakdown.Period, _ key: String) -> Tally {
+        switch split {
+        case .drive: key == "in" ? p.inDrive : p.notInDrive
+        case .source: p.bySource[key] ?? Tally()
+        case .kind: p.byKind[key] ?? Tally()
+        }
+    }
 
     var body: some View {
+        let series = series
+        let pieces = all.flatMap { p in series.map { Piece(period: p.period, series: $0.title, tally: tally(p, $0.key)) } }
+            .filter { $0.tally.bytes > 0 }
         VStack(alignment: .leading, spacing: 8) {
-            Chart {
-                ForEach(all) { p in
-                    BarMark(x: .value("When", p.period), y: .value("GB", gb(p.inDrive.bytes)))
-                        .foregroundStyle(by: .value("Status", "In Google Drive"))
-                    BarMark(x: .value("When", p.period), y: .value("GB", gb(p.notInDrive.bytes)))
-                        .foregroundStyle(by: .value("Status", "Not in Google Drive yet"))
-                }
+            Chart(pieces) { piece in
+                BarMark(x: .value("When", piece.period), y: .value("GB", gb(piece.tally.bytes)))
+                    .foregroundStyle(by: .value("What", piece.series))
             }
-            .chartForegroundStyleScale(["In Google Drive": Theme.good, "Not in Google Drive yet": Theme.warn])
+            .chartForegroundStyleScale(domain: series.map(\.title), range: series.map(\.color))
             .chartXAxis {
                 // About a dozen labels, however many bars.
                 let step = max(1, Int((Double(all.count) / 12).rounded(.up)))
@@ -253,9 +303,25 @@ private struct Timeline: View {
                             guard let onPick, let x: String = proxy.value(atX: point.x) else { return }
                             onPick(x)
                         }
+                        .onContinuousHover { phase in
+                            if case .active(let point) = phase { hovered = proxy.value(atX: point.x) } else { hovered = nil }
+                        }
                 }
             }
             .frame(height: 200)
+            readout(series)
+        }
+    }
+
+    /// "2026 · 42 GB: Camera 20 GB · WhatsApp 12 GB · …" for the bar under the pointer.
+    @ViewBuilder private func readout(_ series: [(key: String, title: String, color: Color)]) -> some View {
+        if let h = hovered, let p = all.first(where: { $0.period == h }) {
+            let parts = series.map { ($0.title, tally(p, $0.key).bytes) }.filter { $0.1 > 0 }
+                .sorted { $0.1 > $1.1 }.map { "\($0.0) \(Fmt.bytes($0.1))" }
+            Text("\(label(h)) · \(Fmt.bytes(p.total.bytes)): " + parts.joined(separator: " · "))
+                .font(.caption.weight(.semibold)).monospacedDigit().lineLimit(2)
+        } else {
+            Text("Point at a bar to see what it is made of.").font(.caption).foregroundStyle(.secondary)
         }
     }
 

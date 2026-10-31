@@ -9,11 +9,15 @@ public struct Breakdown: Sendable {
         public let tally: Tally
         public var id: String { key }
     }
-    /// One period with what of it is already in Drive.
+    /// One period with what of it is already in Drive, and what it is made of.
     public struct Period: Identifiable, Hashable, Sendable {
         public let period: String
-        public let total: Tally
-        public let inDrive: Tally
+        public var total = Tally()
+        public var inDrive = Tally()
+        /// Keyed by `Channel` raw value, as `bySource`.
+        public var bySource: [String: Tally] = [:]
+        /// Keyed as `byKind`.
+        public var byKind: [String: Tally] = [:]
         public var id: String { period }
         public var notInDrive: Tally { Tally(count: total.count - inDrive.count, bytes: total.bytes - inDrive.bytes) }
     }
@@ -74,12 +78,20 @@ extension Ledger {
         ].filter { $0.tally.count > 0 }
 
         func periods(_ expr: String) throws -> [Breakdown.Period] {
-            try db.rows("""
-                SELECT \(expr) p, COUNT(*), COALESCE(SUM(a.size_bytes), 0),
+            var out: [Breakdown.Period] = []
+            for r in try db.rows("""
+                SELECT \(expr) p, \(Channel.sql) ch, \(kind) k, COUNT(*), COALESCE(SUM(a.size_bytes), 0),
                        SUM(\(verified)), COALESCE(SUM(CASE WHEN \(verified) THEN a.size_bytes END), 0)
-                \(base) AND a.created_at_device IS NOT NULL GROUP BY p ORDER BY p
-                """, args)
-                .map { r in Breakdown.Period(period: r.str(0), total: tally(r, 1), inDrive: tally(r, 3)) }
+                \(base) AND a.created_at_device IS NOT NULL GROUP BY p, ch, k ORDER BY p
+                """, args) {
+                if out.last?.period != r.str(0) { out.append(Breakdown.Period(period: r.str(0))) }
+                let t = tally(r, 3)
+                out[out.count - 1].total = out[out.count - 1].total + t
+                out[out.count - 1].inDrive = out[out.count - 1].inDrive + tally(r, 5)
+                out[out.count - 1].bySource[r.str(1), default: Tally()] = out[out.count - 1].bySource[r.str(1), default: Tally()] + t
+                out[out.count - 1].byKind[r.str(2), default: Tally()] = out[out.count - 1].byKind[r.str(2), default: Tally()] + t
+            }
+            return out
         }
         b.byYear = try periods("substr(a.created_at_device, 1, 4)")
         b.byMonth = try periods("substr(a.created_at_device, 1, 7)")

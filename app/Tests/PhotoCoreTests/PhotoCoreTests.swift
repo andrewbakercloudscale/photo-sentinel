@@ -144,6 +144,12 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(all.byYear[0].inDrive.bytes, 100)
         XCTAssertEqual(all.byYear[0].notInDrive.bytes, 200)
         XCTAssertEqual(all.byMonth.map(\.period), ["2019-03", "2019-04", "2026-09", "2026-10"], "every month, not only recent ones")
+        XCTAssertEqual(all.byYear[0].total, Tally(count: 2, bytes: 300))
+        XCTAssertEqual(all.byYear[0].bySource, ["whatsapp": Tally(count: 2, bytes: 300)])
+        XCTAssertEqual(all.byYear[0].byKind, ["photo": Tally(count: 1, bytes: 100), "video": Tally(count: 1, bytes: 200)])
+        XCTAssertEqual(all.byYear[1].bySource.mapValues(\.bytes), ["camera": 300, "screenshot": 400])
+        XCTAssertEqual(all.byYear[1].byKind.mapValues(\.bytes), ["live": 300, "screenshot": 400])
+        XCTAssertEqual(all.byYear[1].inDrive.bytes, 300)
 
         let wa = try Ledger.breakdown(db, filter: Filter(source: "whatsapp"), now: now)
         XCTAssertEqual(wa.total, Tally(count: 2, bytes: 300))
