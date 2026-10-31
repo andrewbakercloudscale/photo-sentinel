@@ -1,3 +1,4 @@
+import AppKit
 import PhotoCore
 import SwiftUI
 
@@ -11,6 +12,9 @@ struct LayoutCard: View {
     @State private var refile: RefileReport?
     @State private var working: String?
     @State private var message: (ok: Bool, text: String)?
+    /// The folder Browse is finding in Google Drive, and why it could not.
+    @State private var opening: String?
+    @State private var linkError: String?
 
     /// Layouts inside a source's Drive folder. Every pattern starts with {source}: upload strips
     /// that level to reach the source's own folder.
@@ -97,6 +101,7 @@ struct LayoutCard: View {
                 Text("SOURCE")
                 Text("GOOGLE DRIVE FOLDER")
                 Text("FOLDERS INSIDE IT")
+                Text("")
             }
             .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
             ForEach(Self.sources, id: \.kind) { s in
@@ -120,11 +125,34 @@ struct LayoutCard: View {
                         }
                         .labelsHidden().fixedSize()
                     }
+                    // An empty folder means with the photos.
+                    let folder = (d.destinations[s.kind].flatMap { $0.isEmpty ? nil : $0 } ?? d.destinations["photos"] ?? "")
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+                    CapsuleButton(title: opening == folder ? "Opening…" : "Browse", symbol: "arrow.up.forward.square",
+                                  color: Tab.backup.color, style: .ghost) { browse(folder) }
+                        .disabled(opening != nil || folder.isEmpty)
+                        .help("Opens \(folder) in Google Drive in your browser.")
                 }
             }
         }
+        if let linkError {
+            Text(linkError).font(.caption).foregroundStyle(Theme.bad)
+        }
         Text("Folders start at the top of your Google Drive. Leave one empty to keep that source with the photos. Videos use the photos' layout.")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func browse(_ folder: String) {
+        let engine = model.engine
+        opening = folder
+        linkError = nil
+        Task {
+            switch await Task.detached(operation: { Result { try engine.folderLink(folder) } }).value {
+            case .success(let url): NSWorkspace.shared.open(url)
+            case .failure(let e): linkError = "Could not open \(folder): \((e as? JobError)?.text ?? "\(e)")"
+            }
+            opening = nil
+        }
     }
 
     @ViewBuilder private func placeControls(_ d: LayoutReport.Settings) -> some View {
