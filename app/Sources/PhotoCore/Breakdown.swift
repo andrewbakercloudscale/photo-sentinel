@@ -18,6 +18,8 @@ public struct Breakdown: Sendable {
         public var bySource: [String: Tally] = [:]
         /// Keyed as `byKind`.
         public var byKind: [String: Tally] = [:]
+        /// What Other apps is made of, keyed by bundle id.
+        public var byApp: [String: Tally] = [:]
         public var id: String { period }
         public var notInDrive: Tally { Tally(count: total.count - inDrive.count, bytes: total.bytes - inDrive.bytes) }
     }
@@ -81,8 +83,9 @@ extension Ledger {
             var out: [Breakdown.Period] = []
             for r in try db.rows("""
                 SELECT \(expr) p, \(Channel.sql) ch, \(kind) k, COUNT(*), COALESCE(SUM(a.size_bytes), 0),
-                       SUM(\(verified)), COALESCE(SUM(CASE WHEN \(verified) THEN a.size_bytes END), 0)
-                \(base) AND a.created_at_device IS NOT NULL GROUP BY p, ch, k ORDER BY p
+                       SUM(\(verified)), COALESCE(SUM(CASE WHEN \(verified) THEN a.size_bytes END), 0),
+                       CASE WHEN (\(Channel.sql)) = 'otherApps' THEN a.source_bundle_id ELSE '' END app
+                \(base) AND a.created_at_device IS NOT NULL GROUP BY p, ch, k, app ORDER BY p
                 """, args) {
                 if out.last?.period != r.str(0) { out.append(Breakdown.Period(period: r.str(0))) }
                 let t = tally(r, 3)
@@ -90,12 +93,39 @@ extension Ledger {
                 out[out.count - 1].inDrive = out[out.count - 1].inDrive + tally(r, 5)
                 out[out.count - 1].bySource[r.str(1), default: Tally()] = out[out.count - 1].bySource[r.str(1), default: Tally()] + t
                 out[out.count - 1].byKind[r.str(2), default: Tally()] = out[out.count - 1].byKind[r.str(2), default: Tally()] + t
+                if !r.str(7).isEmpty {
+                    out[out.count - 1].byApp[r.str(7), default: Tally()] = out[out.count - 1].byApp[r.str(7), default: Tally()] + t
+                }
             }
             return out
         }
         b.byYear = try periods("substr(a.created_at_device, 1, 4)")
         b.byMonth = try periods("substr(a.created_at_device, 1, 7)")
         return b
+    }
+}
+
+extension Breakdown {
+    /// The apps inside Other apps that use the most across `periods`, biggest first.
+    public static func biggestApps(_ periods: [Period], limit: Int) -> [String] {
+        var sums: [String: Int64] = [:]
+        for p in periods { for (k, t) in p.byApp { sums[k, default: 0] += t.bytes } }
+        return sums.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.prefix(limit).map(\.key)
+    }
+}
+
+extension Breakdown.Period {
+    /// `bySource` with each of `apps` broken out of Other apps as "app:<bundle>"; what is
+    /// left stays "otherApps", and drops out when nothing is.
+    public func sources(breakingOut apps: [String]) -> [String: Tally] {
+        var out = bySource
+        for app in apps {
+            guard let t = byApp[app], t.count > 0 else { continue }
+            out["app:" + app] = t
+            let rest = (out["otherApps"] ?? Tally()) - t
+            out["otherApps"] = rest.count > 0 ? rest : nil
+        }
+        return out
     }
 }
 
@@ -138,4 +168,5 @@ extension Ledger {
 
 extension Tally {
     public static func + (a: Tally, b: Tally) -> Tally { Tally(count: a.count + b.count, bytes: a.bytes + b.bytes) }
+    public static func - (a: Tally, b: Tally) -> Tally { Tally(count: a.count - b.count, bytes: a.bytes - b.bytes) }
 }

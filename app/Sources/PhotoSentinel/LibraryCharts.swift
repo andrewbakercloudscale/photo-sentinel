@@ -243,15 +243,23 @@ private struct Timeline: View {
         var id: String { period + "|" + series }
     }
 
+    /// The apps broken out of Other apps.
+    private var apps: [String] { Breakdown.biggestApps(all, limit: Self.appColors.count) }
+
     /// The series, biggest overall first, with their titles and colours.
     private var series: [(key: String, title: String, color: Color)] {
         switch split {
         case .drive:
             return [("in", "In Google Drive", Theme.good), ("out", "Not in Google Drive yet", Theme.warn)]
         case .source:
-            return order(\.bySource).map { k in
+            // Other apps is mostly a few apps (AirDrop, Snapchat): give each its own colour.
+            let apps = apps
+            return order { $0.sources(breakingOut: apps) }.map { k in
+                if k.hasPrefix("app:"), let i = apps.firstIndex(of: String(k.dropFirst(4))) {
+                    return (k, Fmt.app(apps[i]), Self.appColors[i])
+                }
                 let c = Channel(rawValue: k) ?? .unattributed
-                return (k, c.title, Theme.color(c))
+                return (k, c == .otherApps && !apps.isEmpty ? "Smaller apps" : c.title, Theme.color(c))
             }
         case .kind:
             let titles = ["photo": "Photos", "live": "Live Photos", "video": "Videos", "screenshot": "Screenshots"]
@@ -259,23 +267,26 @@ private struct Timeline: View {
         }
     }
 
-    private func order(_ path: KeyPath<Breakdown.Period, [String: Tally]>) -> [String] {
+    /// The colours left over from the sources, for the apps broken out of Other apps.
+    static let appColors: [Color] = [Theme.series[1], Theme.series[5], Color(light: "#0e7490", dark: "#22d3ee"), Color(light: "#a16207", dark: "#facc15")]
+
+    private func order(_ split: (Breakdown.Period) -> [String: Tally]) -> [String] {
         var sums: [String: Int64] = [:]
-        for p in all { for (k, t) in p[keyPath: path] { sums[k, default: 0] += t.bytes } }
+        for p in all { for (k, t) in split(p) { sums[k, default: 0] += t.bytes } }
         return sums.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
     }
 
-    private func tally(_ p: Breakdown.Period, _ key: String) -> Tally {
+    private func tally(_ p: Breakdown.Period, _ key: String, apps: [String] = []) -> Tally {
         switch split {
         case .drive: key == "in" ? p.inDrive : p.notInDrive
-        case .source: p.bySource[key] ?? Tally()
+        case .source: p.sources(breakingOut: apps)[key] ?? Tally()
         case .kind: p.byKind[key] ?? Tally()
         }
     }
 
     var body: some View {
-        let series = series
-        let pieces = all.flatMap { p in series.map { Piece(period: p.period, series: $0.title, tally: tally(p, $0.key)) } }
+        let series = series, apps = apps
+        let pieces = all.flatMap { p in series.map { Piece(period: p.period, series: $0.title, tally: tally(p, $0.key, apps: apps)) } }
             .filter { $0.tally.bytes > 0 }
         VStack(alignment: .leading, spacing: 8) {
             Chart(pieces) { piece in
@@ -309,14 +320,14 @@ private struct Timeline: View {
                 }
             }
             .frame(height: 200)
-            readout(series)
+            readout(series, apps: apps)
         }
     }
 
     /// "2026 · 42 GB: Camera 20 GB · WhatsApp 12 GB · …" for the bar under the pointer.
-    @ViewBuilder private func readout(_ series: [(key: String, title: String, color: Color)]) -> some View {
+    @ViewBuilder private func readout(_ series: [(key: String, title: String, color: Color)], apps: [String]) -> some View {
         if let h = hovered, let p = all.first(where: { $0.period == h }) {
-            let parts = series.map { ($0.title, tally(p, $0.key).bytes) }.filter { $0.1 > 0 }
+            let parts = series.map { ($0.title, tally(p, $0.key, apps: apps).bytes) }.filter { $0.1 > 0 }
                 .sorted { $0.1 > $1.1 }.map { "\($0.0) \(Fmt.bytes($0.1))" }
             Text("\(label(h)) · \(Fmt.bytes(p.total.bytes)): " + parts.joined(separator: " · "))
                 .font(.caption.weight(.semibold)).monospacedDigit().lineLimit(2)

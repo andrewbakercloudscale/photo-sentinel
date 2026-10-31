@@ -166,14 +166,16 @@ struct PlacesCard: View {
                                     if open.contains(p.id) { open.remove(p.id) } else { open.insert(p.id) }
                                 }
                             }
-                            RowButton(title: "Clean up", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country) }
+                            RowButton(title: "Filter", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country) }
+                                .help("Pick everything taken in \(p.country) in Set your backup rules. Nothing is removed from here.")
                         }
                         if open.contains(p.id) {
                             ForEach(p.cities.prefix(15)) { c in
                                 ActionRow(label: "    " + c.city, value: Double(c.total.bytes) / max(top, 1), text: Fmt.bytes(c.total.bytes),
                                           color: Tab.library.color.opacity(0.55),
                                           note: "    \(Fmt.count(c.total.count)) items · \(Fmt.pct(c.coverage)) in Google Drive") {
-                                    RowButton(title: "Clean up", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country, city: c.city) }
+                                    RowButton(title: "Filter", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country, city: c.city) }
+                                        .help("Pick everything taken in \(c.city) in Set your backup rules. Nothing is removed from here.")
                                 }
                             }
                         }
@@ -198,10 +200,11 @@ struct AppsCard: View {
                     ActionRow(label: Fmt.app(a.bundle), value: Double(a.tally.bytes) / max(top, 1), text: Fmt.bytes(a.tally.bytes),
                               color: Theme.series[2], note: "\(Fmt.count(a.tally.count)) items") {
                         AppBackupButton(model: model, bundle: a.bundle)
-                        RowButton(title: "Clean up", symbol: "line.3.horizontal.decrease") {
+                        RowButton(title: "Filter", symbol: "line.3.horizontal.decrease") {
                             model.draft = Filter(source: a.bundle)
                             model.openBuilder()
                         }
+                        .help("Pick everything \(Fmt.app(a.bundle)) saved in Set your backup rules. Nothing is removed from here.")
                     }
                 }
             }

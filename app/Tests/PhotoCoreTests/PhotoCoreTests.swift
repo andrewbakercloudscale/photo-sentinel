@@ -150,11 +150,33 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(all.byYear[1].bySource.mapValues(\.bytes), ["camera": 300, "screenshot": 400])
         XCTAssertEqual(all.byYear[1].byKind.mapValues(\.bytes), ["live": 300, "screenshot": 400])
         XCTAssertEqual(all.byYear[1].inDrive.bytes, 300)
+        XCTAssertEqual(all.byYear[1].byApp, [:], "only Other apps is split by app")
 
         let wa = try Ledger.breakdown(db, filter: Filter(source: "whatsapp"), now: now)
         XCTAssertEqual(wa.total, Tally(count: 2, bytes: 300))
         XCTAssertEqual(wa.bySource.map(\.key), ["whatsapp"])
         XCTAssertEqual(wa.oldest?.prefix(7), "2019-03")
+    }
+
+    func testOtherAppsBreaksOutItsBiggestApps() throws {
+        let db = try makeDB()
+        try insert(db, 1, file: "a", bundle: "com.apple.sharingd", at: "2023-03-01T00:00:00Z", bytes: 900)
+        try insert(db, 2, file: "b", bundle: "com.toyopagroup.picaboo", at: "2023-04-01T00:00:00Z", bytes: 300)
+        try insert(db, 3, file: "c", bundle: "com.openai.chat", at: "2023-05-01T00:00:00Z", bytes: 50)
+        try insert(db, 4, file: "d", bundle: "com.apple.sharingd", at: "2024-01-01T00:00:00Z", bytes: 100)
+        try insert(db, 5, file: "e", bundle: "net.whatsapp.WhatsApp", at: "2023-01-01T00:00:00Z", bytes: 70)
+        let years = try Ledger.breakdown(db).byYear
+        XCTAssertEqual(years[0].byApp.mapValues(\.bytes), ["com.apple.sharingd": 900, "com.toyopagroup.picaboo": 300, "com.openai.chat": 50])
+
+        let top = Breakdown.biggestApps(years, limit: 2)
+        XCTAssertEqual(top, ["com.apple.sharingd", "com.toyopagroup.picaboo"], "biggest across every year")
+        XCTAssertEqual(years[0].sources(breakingOut: top).mapValues(\.bytes),
+                       ["app:com.apple.sharingd": 900, "app:com.toyopagroup.picaboo": 300, "otherApps": 50, "whatsapp": 70],
+                       "the rest stays Other apps")
+        XCTAssertEqual(years[1].sources(breakingOut: top).mapValues(\.bytes), ["app:com.apple.sharingd": 100],
+                       "nothing left in Other apps, so it drops out")
+        let sum = years[0].sources(breakingOut: top).values.reduce(Tally(), +)
+        XCTAssertEqual(sum, years[0].total, "breaking out never changes the bar's height")
     }
 
     /// A WAL ledger nothing else has open has no -wal or -shm file. It must still read, and never take a write.
