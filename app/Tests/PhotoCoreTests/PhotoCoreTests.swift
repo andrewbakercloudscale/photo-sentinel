@@ -480,6 +480,13 @@ final class DetectorTests: XCTestCase {
         XCTAssertEqual(f.map(\.id), ["job.whatsapp/photo", "ready.screenshots"])
         XCTAssertEqual(f[0].action, .resume("whatsapp/photo"))
     }
+
+    func testTheSharedGoogleSignInAsksForYourOwn() {
+        XCTAssertFalse(Detector.findings(library: LibrarySnapshot(), jobs: [], doctor: nil).contains { $0.action == .ownSignIn })
+        let f = Detector.findings(library: LibrarySnapshot(), jobs: [], doctor: nil, sharedSignIn: true)
+        XCTAssertEqual(f.map(\.id), ["google.signin"])
+        XCTAssertEqual(f[0].actionTitle, "Sign in to Google")
+    }
 }
 
 final class LowMacSpaceTests: XCTestCase {

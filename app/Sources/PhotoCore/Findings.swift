@@ -9,6 +9,7 @@ public struct Finding: Identifiable, Hashable, Sendable {
         case openTab(String)
         case emptyBin
         case macStorage          // macOS Settings > General > Storage
+        case ownSignIn           // Settings > Where backups go, with the sign-in steps open
         case none
     }
 
@@ -49,8 +50,18 @@ public enum Detector {
                        action: binWorthIt ? .emptyBin : .macStorage, bytes: .max)
     }
 
-    public static func findings(library s: LibrarySnapshot, jobs: [Job], doctor: DoctorReport?, binBytes: Int64? = nil) -> [Finding] {
+    /// `sharedSignIn`: Google Drive signs in through rclone's shared Google project, whose
+    /// quota slows uploads for everyone using it.
+    public static func findings(library s: LibrarySnapshot, jobs: [Job], doctor: DoctorReport?, binBytes: Int64? = nil,
+                                sharedSignIn: Bool = false) -> [Finding] {
         var out: [Finding] = []
+
+        if sharedSignIn {
+            out.append(Finding(id: "google.signin", kind: .job, symbol: "person.badge.key.fill",
+                               title: "Sign in to Google yourself so uploads stop being slowed down",
+                               detail: "Photo Sentinel signs in to Google through rclone, a tool shared by many people, and Google limits how fast all of them together can upload. Your own sign-in gets you your own limit. It's free, takes about 10 minutes, and you only do it once. Backups keep running meanwhile.",
+                               actionTitle: "Sign in to Google", action: .ownSignIn, bytes: .max - 4))
+        }
 
         for c in doctor?.results ?? [] where c.failed {
             if c.name == "disk headroom" {

@@ -196,7 +196,7 @@ struct SettingsView: View {
                 Text("How long each type of media stays on the phone is set on the Library tab, where you see what each choice frees.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            StorageCard(model: model)
+            StorageCard(model: model).id("storage")
             GooglePhotosCard(model: model)
             WhenBackupsRunCard(model: model)
             Card(title: "Where things are", symbol: "folder.fill", tint: Tab.backup.color) {

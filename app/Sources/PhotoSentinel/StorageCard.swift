@@ -74,6 +74,8 @@ struct StorageCard: View {
                 .onAppear { reset(s) }
                 .onChange(of: s.remote) { reset(s) }
                 .onChange(of: s.archive) { reset(s) }
+                .onAppear { openSignIn() }
+                .onChange(of: model.ownSignIn) { openSignIn() }
             } else {
                 Text("Reading the backup settings…").font(.callout).foregroundStyle(.secondary)
             }
@@ -84,9 +86,16 @@ struct StorageCard: View {
     /// it. The owner makes their own client in Google Cloud (links below), pastes it here, and
     /// `config own-client` signs in with it in the browser. The account only changes if that
     /// reaches the same Google Drive.
+    /// Checkup's Sign in to Google lands here with the steps open.
+    private func openSignIn() {
+        guard model.ownSignIn else { return }
+        showOwnClient = true
+        model.ownSignIn = false
+    }
+
     @ViewBuilder private func clientIdHint(_ s: StorageReport) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("Uploads to \(s.accountTitle) are slowed down: it signs in through rclone's shared Google project, and Google Drive limits how fast everyone using it can upload. Your own sign-in, free, lifts that. About 10 minutes, once.",
+            Label("Uploads to Google Drive are slow. Photo Sentinel uploads with a tool called rclone, which signs in to Google as rclone, and Google limits how fast all of rclone's users together can upload. Set up your own sign-in and Google gives you a limit of your own. It's free, takes about 10 minutes, and you only do it once.",
                   systemImage: "tortoise.fill")
                 .foregroundStyle(Theme.warn)
             if showOwnClient {

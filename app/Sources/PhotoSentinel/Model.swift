@@ -34,6 +34,8 @@ final class Model: ObservableObject {
     @Published var removing: Recipe? { didSet { if removing == nil { planNextIfAny() } } }
     /// A section to scroll to once its tab shows ("builder").
     @Published var scrollTarget: String?
+    /// Set by Checkup's Sign in to Google: Where backups go opens its sign-in steps.
+    @Published var ownSignIn = false
     let permissions = Permissions()
     let updates = UpdateChecker()
     private var forwarding: AnyCancellable?
@@ -95,7 +97,8 @@ final class Model: ObservableObject {
 
     var findings: [Finding] {
         guard let library else { return [] }
-        return Detector.findings(library: library, jobs: jobs, doctor: doctor, binBytes: binBytes)
+        return Detector.findings(library: library, jobs: jobs, doctor: doctor, binBytes: binBytes,
+                                 sharedSignIn: storage?.sharedClientId == true)
     }
 
     var activeJob: Job? { jobs.first { if case .running = $0.state { return true }; if case .paused = $0.state { return true }; return false } }
@@ -508,6 +511,10 @@ final class Model: ObservableObject {
         case .emptyBin: emptyBin()
         case .macStorage:
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.settings.Storage")!)
+        case .ownSignIn:
+            tab = .settings
+            ownSignIn = true
+            scrollTarget = "storage"
         case .none: break
         }
     }
