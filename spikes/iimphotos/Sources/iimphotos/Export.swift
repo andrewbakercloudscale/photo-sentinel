@@ -9,7 +9,7 @@ import Photos
 /// video would otherwise have to fit in RAM.
 enum Export {
 
-    static func run(timeout: Double, allowNetwork: Bool) {
+    static func run(timeout: Double, allowNetwork: Bool, motion: Bool = false) {
         var requested = 0
         var written = 0
         var failed = 0
@@ -18,7 +18,7 @@ enum Export {
         let started = Date()
 
         Out.emit(["event": "exportStart", "allowNetwork": allowNetwork,
-                  "timeoutSeconds": Int(timeout)])
+                  "timeoutSeconds": Int(timeout), "motion": motion])
 
         while let line = readLine(strippingNewline: true) {
             if line.isEmpty { continue }
@@ -31,7 +31,8 @@ enum Export {
             }
             requested += 1
             let result = exportOne(identifier: parts[0], destination: parts[1],
-                                   timeout: timeout, allowNetwork: allowNetwork)
+                                   timeout: timeout, allowNetwork: allowNetwork,
+                                   motion: motion)
             if result.error == nil {
                 written += 1
                 bytes += result.bytes
@@ -63,7 +64,8 @@ enum Export {
     }
 
     private static func exportOne(identifier: String, destination: String,
-                                  timeout: Double, allowNetwork: Bool) -> Outcome {
+                                  timeout: Double, allowNetwork: Bool,
+                                  motion: Bool) -> Outcome {
         var outcome = Outcome()
         var record: [String: Any] = ["event": "exported", "localIdentifier": identifier,
                                      "path": destination]
@@ -82,11 +84,22 @@ enum Export {
         }
 
         let resources = PHAssetResource.assetResources(for: asset)
-        // The original, never a rendition. Requesting the wrong resource is the
-        // transcoding hazard in docs/SAFETY.md section 2b.
-        guard let resource = resources.first(where: {
-            $0.type == .photo || $0.type == .video
-        }) ?? resources.first else {
+        let chosen: PHAssetResource?
+        if motion {
+            // A Live Photo's motion half as captured. .fullSizePairedVideo is
+            // an edit's rendition, the same transcoding hazard as below.
+            guard let paired = resources.first(where: { $0.type == .pairedVideo }) else {
+                return fail("asset has no Live Photo motion half", code: "NO_MOTION")
+            }
+            chosen = paired
+        } else {
+            // The original, never a rendition. Requesting the wrong resource is the
+            // transcoding hazard in docs/SAFETY.md section 2b.
+            chosen = resources.first(where: {
+                $0.type == .photo || $0.type == .video
+            }) ?? resources.first
+        }
+        guard let resource = chosen else {
             return fail("asset exposes no resources", code: "NO_RESOURCE")
         }
 

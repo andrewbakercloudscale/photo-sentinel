@@ -86,14 +86,24 @@ class Helper:
         yield from self._stream(["scan", "--ids"], stdin=payload)
 
     def export(
-        self, work: list[tuple[str, Path]], *, timeout: float = 1800, allow_network: bool = True
+        self,
+        work: list[tuple[str, Path]],
+        *,
+        timeout: float = 1800,
+        allow_network: bool = True,
+        motion: bool = False,
     ) -> Iterator[dict[str, Any]]:
-        """Export originals. `work` is (local identifier, destination path)."""
+        """Export originals. `work` is (local identifier, destination path).
+
+        `motion` writes each Live Photo's motion half instead of its still.
+        """
         if not work:
             return
         args = ["export", "--timeout", str(int(timeout))]
         if not allow_network:
             args.append("--no-network")
+        if motion:
+            args.append("--motion")
         payload = "".join(f"{identifier}\t{path}\n" for identifier, path in work)
         # Overall timeout allows for every asset taking its own full timeout.
         yield from self._stream(args, stdin=payload, timeout=timeout * len(work) + 60)

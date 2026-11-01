@@ -48,6 +48,7 @@ from .cloud import (
 from .config import Config, RemovalPolicy
 from .db.database import Database, utcnow
 from .journal import Journal, Op
+from .live import motion_object
 from .logs import get_logger
 from .photos.helper import Helper, HelperError
 from .scanner import scan as run_scan
@@ -91,6 +92,9 @@ class Candidate:
     md5: str | None = None
     #: Over the low-res tolerance: it goes only if Drive's copy is the original's size.
     needs_size_check: bool = False
+    #: A Live Photo's motion half: its remote path and the remote hash recorded
+    #: when it was verified. Listed again with the still before removal.
+    motion: dict[str, Any] | None = None
 
 
 @dataclass
@@ -145,24 +149,18 @@ def _incomplete_group(asset: dict[str, Any], db: Database) -> str | None:
     archived, **zero** `.MOV` files anywhere in the tree, and `asset_resources`
     empty. The motion half of every one of them has never been fetched. The
     still image passes every other check in this module, which is precisely
-    what makes it dangerous -- so the check is on the asset's own subtypes,
-    which are populated, rather than on the resource table, which is not. A
-    gate that cannot see what it is meant to check must block, not wave
-    through.
+    what makes it dangerous -- so the check starts from the asset's own
+    subtypes, which are populated, and asks for a verified motion half that
+    `live.py` recorded. A gate that cannot see what it is meant to check must
+    block, not wave through.
     """
     try:
         subtypes = json.loads(asset.get("subtypes") or "[]")
     except (TypeError, ValueError):
         return "subtypes could not be read, so group completeness is unknown"
 
-    if "live" in subtypes:
-        verified = db.conn.execute(
-            "SELECT COUNT(*) FROM asset_resources WHERE asset_id = ? "
-            "AND resource_type = 'LIVE_PHOTO_VIDEO' AND local_status = 'LOCAL_VERIFIED'",
-            (asset["id"],),
-        ).fetchone()[0]
-        if not verified:
-            return "Live Photo whose motion half is not archived"
+    if "live" in subtypes and motion_object(db, int(asset["id"])) is None:
+        return "Live Photo whose motion half is not archived"
 
     burst = asset.get("burst_uuid")
     if burst:
@@ -432,6 +430,7 @@ def plan(
                 cloud_path=str(asset.get("cloud_path") or ""),
                 md5=asset.get("md5"),
                 needs_size_check=suspect,
+                motion=motion_object(db, int(asset["id"])),
                 evidence={
                     "scan_id": scan_id,
                     "local_status": asset.get("local_status"),
@@ -469,7 +468,10 @@ def plan(
     # One listing per destination in play, for the reason release gives: a
     # video checked against the photo archive is reported missing, and this is
     # the code path where "missing" decides whether a photograph is deleted.
-    wanted_destinations = sorted({split_cloud_path(config, c.cloud_path)[0] for c in wanted})
+    wanted_destinations = sorted(
+        {split_cloud_path(config, c.cloud_path)[0] for c in wanted}
+        | {split_cloud_path(config, c.motion["path"])[0] for c in wanted if c.motion}
+    )
     expected = sum(
         int(
             db.conn.execute(
@@ -520,9 +522,17 @@ def plan(
                 result.block(asset_row, "flagged as a suspected proxy")
                 continue
             if size != candidate.size_bytes:
-                result.block(asset_row, "Drive's copy is not the size of the original")
+                result.block(asset_row, "Google Drive's copy is not the size of the original")
                 continue
             candidate.evidence["original_size_confirmed"] = size
+        if candidate.motion:
+            # The other half of the group, held to the same rule as the still:
+            # the remote, listed just now, holds it with the hash recorded.
+            where, name = split_cloud_path(config, candidate.motion["path"])
+            if remote.get(where, {}).get(name) != candidate.motion["hash"]:
+                result.block(asset_row, "Live Photo whose motion half is not in the cloud now")
+                continue
+            candidate.evidence["motion_hash_confirmed"] = candidate.motion["path"]
         candidate.evidence["remote_hash_confirmed"] = True
         eligible.append(candidate)
 

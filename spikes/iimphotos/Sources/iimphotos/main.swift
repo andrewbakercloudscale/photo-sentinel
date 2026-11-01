@@ -41,6 +41,8 @@ EXPORT OPTIONS
     --timeout S      Per-asset timeout in seconds. Default: 1800.
     --no-network     Refuse iCloud downloads, so only already-local assets
                      succeed. Useful for measuring what is resident.
+    --motion         Write each Live Photo's motion half (the .MOV) instead of
+                     its still. An asset without one fails with NO_MOTION.
 
 FETCH OPTIONS
     --count N        How many assets to sample. Default: 10.
@@ -150,7 +152,8 @@ case "export":
           exportTimeout > 0 else {
         Out.fail("--timeout must be a positive number of seconds", code: 64)
     }
-    Export.run(timeout: exportTimeout, allowNetwork: !args.contains("--no-network"))
+    Export.run(timeout: exportTimeout, allowNetwork: !args.contains("--no-network"),
+               motion: args.contains("--motion"))
     exit(0)
 
 case "trash":

@@ -255,7 +255,7 @@ for line in sys.stdin:
     say "Bin: holds $total item(s) but $(printf '%s\n' "$foreign" | wc -l | tr -d ' ') are NOT files this tool released. Leaving it alone. First few: $(printf '%s\n' "$foreign" | head -3 | tr '\n' ' ')"
     return 1
   fi
-  say "Bin: all $total item(s) are released assets (hash-verified in Drive). Emptying."
+  say "Bin: all $total item(s) are released assets (hash-verified in Google Drive). Emptying."
   timeout 600 osascript -e 'tell application "Finder" to empty trash' >/dev/null 2>&1 || { say "Bin: empty trash failed"; return 1; }
   local left; left=$(timeout 60 osascript -e 'tell application "Finder" to count of items in trash' 2>/dev/null || echo "?")
   say "Bin: emptied, $left item(s) remain, $(gb "$(free_b)") GB free"
@@ -289,8 +289,8 @@ release_with_retry() {
     mark=$(log_bytes)
     $PY -m iphone_image release --apply >> "$LOG" 2>&1 && return 0
     if quota_hit_since "$mark"; then
-      if [ "$waited" -ge 10800 ]; then say "release: Drive still over quota after 3h. STOPPING."; exit 6; fi
-      say "release: Drive quota/rate limit hit. Waiting $((wait / 60)) min and retrying."
+      if [ "$waited" -ge 10800 ]; then say "release: Google Drive still over quota after 3h. STOPPING."; exit 6; fi
+      say "release: Google Drive quota/rate limit hit. Waiting $((wait / 60)) min and retrying."
       sleep "$wait"; waited=$((waited + wait))
       wait=$((wait * 2)); [ "$wait" -gt 1800 ] && wait=1800
     elif net_hit_since "$mark"; then
@@ -307,7 +307,7 @@ do_release() {
     local n; n=$(releasable)
     if [ "$n" -gt 0 ]; then
       wait_off_metered   # release re-lists Drive to re-verify: small, but still data
-      say "releasing $n file(s) already verified in Drive"
+      say "releasing $n file(s) already verified in Google Drive"
       release_with_retry
       say "after release: $(gb "$(free_b)") GB free (the Bin still holds it until emptied)"
     fi

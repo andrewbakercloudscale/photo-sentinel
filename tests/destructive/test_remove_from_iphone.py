@@ -248,7 +248,7 @@ def test_a_suspect_stays_when_drive_holds_a_smaller_file(env) -> None:
     remote = {"2019/11/IMG_1.PNG": hashlib.sha256(b"photo").hexdigest()}
     eligible, result = plan(config, db, SizedCloud(remote, 3))
     assert eligible == []
-    assert result.blocks == {"Drive's copy is not the size of the original": 1}
+    assert result.blocks == {"Google Drive's copy is not the size of the original": 1}
 
 
 def test_without_the_remote_as_evidence_a_suspect_is_still_blocked(env) -> None:

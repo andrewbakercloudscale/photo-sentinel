@@ -21,6 +21,7 @@ from .. import __version__
 from .. import audit as audit_engine
 from .. import cloud as cloud_engine
 from .. import google_photos as gphotos_engine
+from .. import live as live_engine
 from .. import locate as locate_engine
 from .. import recover as recover_engine
 from .. import release as release_engine
@@ -1671,6 +1672,84 @@ def cloud(ctx: Context, apply_: bool, **kwargs: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
+# live-photos
+# ---------------------------------------------------------------------------
+
+
+@cli.command(name="live-photos")
+@click.option("--limit", type=int, default=0, help="At most this many. Default: all.")
+@click.option("--apply", "apply_", is_flag=True, help="Actually copy. Without it, plan only.")
+@pass_context
+def live_photos(ctx: Context, limit: int, apply_: bool) -> None:
+    """Back up the motion half of Live Photos whose still is already backed up.
+
+    Each one is copied from Photos, uploaded beside its still with the same name
+    and .MOV, and recorded only when the remote's listing returns its hash.
+    Nothing on the phone is touched; this is what lets removal take Live Photos.
+    """
+    config = ctx.config
+    db = ctx.database()
+    try:
+        work = live_engine.plan(config, db, limit=limit)
+        data: dict[str, Any] = {"applied": apply_, "planned": len(work)}
+        if not apply_:
+
+            def render_plan() -> None:
+                ctx.out.title("Live Photos")
+                ctx.out.pairs([("motion halves to back up", f"{len(work):,}")])
+                for item in work[:8]:
+                    ctx.out.line(f"    {item.destination}/{item.relative}", style="muted")
+                ctx.out.line()
+                if work:
+                    ctx.out.line("  NOTHING HAS BEEN COPIED. Add --apply to run it.", style="warn")
+                else:
+                    ctx.out.ok("every Live Photo backed up so far has its motion half too")
+
+            ctx.out.result(data, render_plan)
+            return
+
+        def progress(line: str) -> None:
+            ctx.out.line(f"  {line}", style="muted")
+
+        try:
+            result = live_engine.run(config, db, limit=limit, on_progress=progress)
+        except (cloud_engine.CloudError, HelperError) as exc:
+            _fail(ctx.out, str(exc))
+            return
+    finally:
+        db.close()
+
+    data.update(
+        {
+            "copied": result.copied,
+            "verified": result.verified,
+            "failed": result.failed,
+            "bytes": result.bytes,
+            "stoppedEarly": result.stopped_early or None,
+            "failures": result.failures[:20],
+        }
+    )
+
+    def render_result() -> None:
+        ctx.out.title("Live Photos")
+        ctx.out.pairs(
+            [
+                ("verified in Google Drive", f"{result.verified:,} of {result.planned:,}"),
+                ("copied", f"{result.copied:,}, {human_bytes(result.bytes)}"),
+                ("failed", f"{result.failed:,}"),
+            ]
+        )
+        if result.stopped_early:
+            ctx.out.line(f"  {result.stopped_early}", style="warn")
+        for failure in result.failures[:10]:
+            ctx.out.line(f"    {failure['file']}: {failure['error']}", style="warn")
+
+    ctx.out.result(data, render_result)
+    if result.failed:
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # remove-from-iphone
 # ---------------------------------------------------------------------------
 
@@ -1707,7 +1786,7 @@ CURRENT_PLAN_PHRASE = "remove what is safe from my iphone"
 @click.option(
     "--progress",
     is_flag=True,
-    help="Write JSON lines to stderr as the scan and the Drive check go, for the Mac app.",
+    help="Write JSON lines to stderr as the scan and the Google Drive check go, for the Mac app.",
 )
 @click.pass_obj
 def remove_from_iphone(
