@@ -15,7 +15,7 @@ struct StorageCard: View {
     @State private var clientId = ""
     @State private var clientSecret = ""
     @State private var signingIn = false
-    @State private var showS3 = false
+    @State var showS3 = false
     @State private var s3 = S3Form()
     @State private var addingS3 = false
 

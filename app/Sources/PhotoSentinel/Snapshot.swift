@@ -59,6 +59,13 @@ enum Snapshot {
                 try? png.write(to: dir.appendingPathComponent("stat-\(stat.rawValue).png"))
             }
         }
+        let storage = ImageRenderer(content: StorageCard(model: model, showS3: true).padding(16).frame(width: 1040)
+            .background(Color(light: "#f5f5f7", dark: "#1c1c1f")))
+        storage.scale = 1
+        if let img = storage.nsImage, let tiff = img.tiffRepresentation,
+           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            try? png.write(to: dir.appendingPathComponent("settings-add-s3.png"))
+        }
         exit(0)
     }
 
