@@ -68,20 +68,47 @@ app saved each item, so "clean up WhatsApp" is exact rather than a filename gues
 
 ## Install
 
-Needs macOS, Python 3.12 or newer, Xcode command line tools and Homebrew.
+Paste this into Terminal. It installs what is missing (Xcode command line tools,
+Homebrew, Python 3.14, exiftool, ffmpeg, rclone), clones this repo to
+`~/Desktop/github/iphone-image-manager`, builds the app, installs it to
+`~/Applications` and opens it. Paste it again to update.
 
 ```bash
-brew install exiftool ffmpeg rclone
-git clone https://github.com/andrewbakercloudscale/photo-sentinel.git ~/Desktop/github/iphone-image-manager
-cd ~/Desktop/github/iphone-image-manager
-python3 -m venv .venv && .venv/bin/pip install -e .
+cat > /tmp/install-photo-sentinel.sh <<'EOF'
+#!/bin/bash
+# Installs Photo Sentinel from https://github.com/andrewbakercloudscale/photo-sentinel
+set -euo pipefail
+DIR="$HOME/Desktop/github/iphone-image-manager"   # the app runs its engine from here
+if ! xcode-select -p >/dev/null 2>&1; then
+  xcode-select --install
+  echo "Finish installing the command line tools in the window that opened, then paste this again."
+  exit 1
+fi
+if ! command -v brew >/dev/null 2>&1; then
+  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+fi
+brew install python@3.14 exiftool ffmpeg rclone
+if [ -d "$DIR/.git" ]; then
+  git -C "$DIR" pull --ff-only
+else
+  mkdir -p "$(dirname "$DIR")"
+  git clone https://github.com/andrewbakercloudscale/photo-sentinel.git "$DIR"
+fi
+cd "$DIR"
+"$(brew --prefix python@3.14)/bin/python3.14" -m venv .venv
+.venv/bin/pip install --quiet -e .
 (cd spikes/iimphotos && swift build -c release)
 bash app/scripts/build-app.sh
+echo "Photo Sentinel is installed in your Applications folder and open."
+EOF
+chmod +x /tmp/install-photo-sentinel.sh && exec /tmp/install-photo-sentinel.sh
 ```
 
-Keep the folder where it is: the app runs the engine from there. The last line
-runs the tests, installs Photo Sentinel to `~/Applications` and opens it. The app
-is signed for your Mac only; no Apple Developer account is involved.
+Keep the folder where it is: the app runs the engine from there. The app is
+signed for your Mac only; no Apple Developer account is involved. With Xcode
+installed, the build runs the app's tests first; with only the command line
+tools it skips them, because XCTest comes with Xcode.
 
 Before the first run, set up Photos as described in
 [Setup](#setup-point-photos-at-icloud-but-keep-the-originals-there) below, then

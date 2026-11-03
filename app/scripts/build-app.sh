@@ -9,8 +9,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "== tests"
-swift test >/dev/null 2>&1 || { swift test 2>&1 | tail -20; echo "tests failed, not building"; exit 1; }
+# XCTest ships with Xcode, not the command line tools: on a Mac with only those (what the
+# blog's installer sets up), the tests cannot run, so skip them rather than refuse to build.
+if [[ "$(xcode-select -p 2>/dev/null)" == */CommandLineTools ]]; then
+    echo "== tests skipped (they need Xcode; the command line tools are enough to build)"
+else
+    echo "== tests"
+    swift test >/dev/null 2>&1 || { swift test 2>&1 | tail -20; echo "tests failed, not building"; exit 1; }
+fi
 
 echo "== build"
 swift build -c release
