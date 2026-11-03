@@ -295,6 +295,9 @@ public struct LibrarySnapshot: Sendable {
     public var proxies = 0
     public var favourites = 0
     public var live = 0
+    /// Live Photos whose still is in Google Drive but whose motion half is not: removal
+    /// keeps them until `live-photos` backs that half up. `live.py`'s `missing`.
+    public var liveMotionMissing = Tally()
     public var apps: [(bundle: String, tally: Tally)] = []
     public var removed = Removal()
     public var unfinishedOperations: [Operation] = []
@@ -447,6 +450,19 @@ public enum Ledger {
         s.proxies = safety.int(0)
         s.favourites = safety.int(1)
         s.live = safety.int(2)
+        // A ledger from before Live Photo backups has no asset_resources table: none are backed up.
+        let motion = (try? db.rows("""
+            SELECT COUNT(*), COALESCE(SUM(a.size_bytes), 0) FROM assets a
+            WHERE \(onPhone) AND COALESCE(a.subtypes, '') LIKE '%"live"%'
+              AND a.cloud_status = 'CLOUD_VERIFIED' AND COALESCE(a.cloud_path, '') <> '' AND a.device_asset_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM asset_resources r WHERE r.asset_id = a.id
+                              AND r.resource_type = 'LIVE_PHOTO_VIDEO' AND r.cloud_status = 'CLOUD_VERIFIED')
+            """)) ?? (try? db.rows("""
+            SELECT COUNT(*), COALESCE(SUM(a.size_bytes), 0) FROM assets a
+            WHERE \(onPhone) AND COALESCE(a.subtypes, '') LIKE '%"live"%'
+              AND a.cloud_status = 'CLOUD_VERIFIED' AND COALESCE(a.cloud_path, '') <> '' AND a.device_asset_id IS NOT NULL
+            """)) ?? []
+        if let m = motion.first { s.liveMotionMissing = Tally(count: m.int(0), bytes: Int64(m.int(1))) }
 
         // A ledger from before places were added has no location_id: it simply has no places yet.
         try? readPlaces(db, into: &s)

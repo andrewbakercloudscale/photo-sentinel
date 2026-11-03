@@ -39,8 +39,9 @@ first. Latest release: [v0.6.0](https://github.com/andrewbakercloudscale/photo-s
 
 **Not done yet:**
 
-- **Live Photos.** The motion half is not backed up yet, so Live Photos stay on
-  the phone. The `live-photos` command is built; the app button is next.
+- **Live Photos: built, not yet run on a real library.** Checkup's "Back up
+  Live Photos" button copies each one's moving part to Google Drive beside its
+  photo; after that, Live Photos can be cleaned up like any other photo.
 - **A signed download.** For now you build the app yourself (below).
 - **Google Drive only.** Other backup targets, such as Amazon S3, are planned.
 

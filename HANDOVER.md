@@ -35,7 +35,7 @@ Check `pgrep -fl "cycle.sh|after-|watch-"` first -- never two exporters at once.
 | screenshots > 1y | ~5,800 of 11,354 in Drive (`.../Andrew iPhone Archive/screenshots`). Owner "generally deletes screenshots" but agreed to finish the backup, then remove |
 | WhatsApp > 18 months | **new pipeline, not started** (queued behind screenshots). 32,242 photos (4.6 GB; 626 proxies, never removable) + ~2,200 videos (~16 GB) -> ONE flat folder `.../Andrew iPhone Archive/WhatsApp Media` |
 | screen recordings | no pipeline, no decision |
-| Live Photos / bursts | 436 + 14 blocked from removal (motion halves / frames never archived); open question |
+| Live Photos / bursts | Live Photos: `live-photos --apply` (Checkup button "Back up Live Photos") backs up the motion halves; 632 waiting, not yet run. 14 bursts still blocked (frames never archived) |
 
 ### Next actions, in order
 
@@ -230,8 +230,9 @@ changing `cycle.sh` again, do not just re-diagnose from scratch)
   the importer first. Nothing built.
 - **Drive object IDs.** `cloud_objects.object_id` is empty though
   `rclone lsjson` already returns IDs. Offered, not done.
-- **436 Live Photos + 14 bursts** are blocked from removal because their
-  motion halves / frames were never archived. Archive them, or leave them.
+- **Live Photos:** the motion-half backup is built (`live-photos`, Checkup
+  button "Back up Live Photos", finding `live.motion`). 632 wait for it; the
+  user starts it. **14 bursts** stay blocked: their frames were never archived.
 - **WhatsApp and screen recordings** still have no pipeline (section 9).
 
 ### Where things live

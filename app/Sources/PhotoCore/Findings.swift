@@ -10,6 +10,7 @@ public struct Finding: Identifiable, Hashable, Sendable {
         case emptyBin
         case macStorage          // macOS Settings > General > Storage
         case ownSignIn           // Settings > Where backups go, with the sign-in steps open
+        case backUpLivePhotos    // live-photos --apply
         case none
     }
 
@@ -53,8 +54,17 @@ public enum Detector {
     /// `sharedSignIn`: Google Drive signs in through rclone's shared Google project, whose
     /// quota slows uploads for everyone using it.
     public static func findings(library s: LibrarySnapshot, jobs: [Job], doctor: DoctorReport?, binBytes: Int64? = nil,
-                                sharedSignIn: Bool = false) -> [Finding] {
+                                sharedSignIn: Bool = false, livePhotosRunning: Bool = false) -> [Finding] {
         var out: [Finding] = []
+
+        let live = s.liveMotionMissing
+        if live.count > 0 {
+            out.append(Finding(id: "live.motion", kind: .space, symbol: "livephoto",
+                               title: "\(Fmt.count(live.count)) Live Photos can't come off the phone yet",
+                               detail: "Google Drive has the photo (\(Fmt.bytes(live.bytes))) but not the few seconds of video that make it move, so they stay on the phone. Back up the moving part and they can be cleaned up like any other photo. Nothing is removed." + (livePhotosRunning ? " Backing up now." : ""),
+                               actionTitle: livePhotosRunning ? "Watch progress" : "Back up Live Photos",
+                               action: livePhotosRunning ? .openTab("Activity") : .backUpLivePhotos, bytes: live.bytes))
+        }
 
         if sharedSignIn {
             out.append(Finding(id: "google.signin", kind: .job, symbol: "person.badge.key.fill",

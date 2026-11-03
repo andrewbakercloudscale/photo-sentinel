@@ -63,8 +63,8 @@ struct CheckupView: View {
         DisclosureGroup("Worth knowing") {
             VStack(alignment: .leading, spacing: 6) {
                 Text("\(Fmt.count(s.favourites)) favourites are never cleaned up.")
-                // Backups copy only the still image; nothing yet copies the motion half, so these never go.
-                Text("\(Fmt.count(s.live)) Live Photos are never cleaned up: backups copy the still photo but not its motion half yet.")
+                // A Live Photo goes only once both halves are in Google Drive: the Live Photos backup copies the moving part.
+                Text("\(Fmt.count(s.live)) Live Photos are cleaned up only once both the photo and its moving part are in Google Drive.")
             }
             .font(.callout).foregroundStyle(.secondary).padding(.top, 4)
         }

@@ -204,6 +204,12 @@ struct TaskRow: View {
         case .remove:
             guard let p = status.decode(RemovalPlan.self) else { return "" }
             return "Removed \(Fmt.count(p.removed ?? 0)), \(Fmt.bytes(p.bytesRemoved ?? 0))."
+        case .livePhotos:
+            guard let r = status.decode(LivePhotosReport.self) else { return "" }
+            var text = "\(Fmt.count(r.verified ?? 0)) of \(Fmt.count(r.planned)) Live Photos now have their moving part in Google Drive (\(Fmt.bytes(r.bytes ?? 0)))."
+            if let failed = r.failed, failed > 0 { text += " \(Fmt.count(failed)) not done; running it again retries them." }
+            if let stopped = r.stoppedEarly { text += " \(stopped)" }
+            return text
         case .googlePhotos:
             guard let r = status.decode(GooglePhotosSend.self) else { return "" }
             var text = "Sent \(Fmt.count(r.sent ?? 0)) of \(Fmt.count(r.planned)) to Google Photos (\(Fmt.bytes(r.bytesSent ?? 0)))."

@@ -95,6 +95,30 @@ final class LedgerTests: XCTestCase {
         XCTAssertEqual(s.proxies, 2)
     }
 
+    /// Live Photos wait for their moving part: live.py's `missing`, counted the same way.
+    func testLivePhotosWithoutTheirMovingPartAreCounted() throws {
+        let db = try makeDB()
+        let live = "[\"live\"]"
+        try insert(db, 1, file: "a", subtypes: live, bytes: 100, cloud: "CLOUD_VERIFIED")
+        try insert(db, 2, file: "b", subtypes: live, bytes: 200, cloud: "CLOUD_VERIFIED")
+        try insert(db, 3, file: "c", subtypes: live, bytes: 400)                                // photo not backed up yet
+        try insert(db, 4, file: "d", subtypes: live, bytes: 800, cloud: "CLOUD_VERIFIED", present: 0) // gone
+        try insert(db, 5, file: "e", bytes: 1600, cloud: "CLOUD_VERIFIED")                      // not a Live Photo
+        try db.exec("ALTER TABLE assets ADD COLUMN device_asset_id TEXT; UPDATE assets SET device_asset_id = 'L' || id;")
+        // An old ledger, before Live Photo backups: every backed-up one is missing its moving part.
+        XCTAssertEqual(try Ledger.read(db, recipes: []).liveMotionMissing, Tally(count: 2, bytes: 300))
+        try db.exec("""
+        CREATE TABLE asset_resources (asset_id INTEGER, resource_type TEXT, cloud_status TEXT);
+        INSERT INTO asset_resources VALUES (1, 'LIVE_PHOTO_VIDEO', 'CLOUD_VERIFIED'), (2, 'LIVE_PHOTO_VIDEO', 'NONE');
+        """)
+        XCTAssertEqual(try Ledger.read(db, recipes: []).liveMotionMissing, Tally(count: 1, bytes: 200))
+        let f = Detector.findings(library: try Ledger.read(db, recipes: []), jobs: [], doctor: nil)
+        XCTAssertEqual(f.first { $0.id == "live.motion" }?.action, .backUpLivePhotos)
+        let running = Detector.findings(library: try Ledger.read(db, recipes: []), jobs: [], doctor: nil, livePhotosRunning: true)
+        XCTAssertEqual(running.first { $0.id == "live.motion" }?.action, .openTab("Activity"))
+        XCTAssertFalse(Detector.findings(library: LibrarySnapshot(), jobs: [], doctor: nil).contains { $0.id == "live.motion" })
+    }
+
     /// "The oldest 5 GB" and "everything up to 18 months" for this one removal, setting untouched.
     func testAScopeTakesTheOldestFirstAndBecomesAnAge() throws {
         let db = try makeDB()

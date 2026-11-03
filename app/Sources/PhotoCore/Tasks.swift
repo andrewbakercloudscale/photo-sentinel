@@ -7,7 +7,7 @@ import Foundation
 /// what lets Activity show it as a job in flight and lets a removal's result be read back
 /// after the fact, rather than living only in a window that has gone.
 public struct CLITask: Identifiable, Codable, Hashable, Sendable {
-    public enum Kind: String, Codable, Sendable { case audit, plan, remove, places, backup, settle, recover, refile, googlePhotos }
+    public enum Kind: String, Codable, Sendable { case audit, plan, remove, places, backup, settle, recover, refile, googlePhotos, livePhotos }
 
     public let id: String
     public let kind: Kind
@@ -309,4 +309,14 @@ extension Ledger {
             return r
         }
     }
+}
+
+/// `live-photos --apply`: the motion halves of Live Photos, backed up beside their stills.
+public struct LivePhotosReport: Decodable, Hashable, Sendable {
+    public let applied: Bool
+    public let planned: Int
+    public let verified: Int?
+    public let failed: Int?
+    public let bytes: Int64?
+    public let stoppedEarly: String?
 }

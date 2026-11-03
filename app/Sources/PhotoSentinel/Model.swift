@@ -98,7 +98,8 @@ final class Model: ObservableObject {
     var findings: [Finding] {
         guard let library else { return [] }
         return Detector.findings(library: library, jobs: jobs, doctor: doctor, binBytes: binBytes,
-                                 sharedSignIn: storage?.sharedClientId == true)
+                                 sharedSignIn: storage?.sharedClientId == true,
+                                 livePhotosRunning: tasks.contains { $0.running && $0.task.kind == .livePhotos })
     }
 
     var activeJob: Job? { jobs.first { if case .running = $0.state { return true }; if case .paused = $0.state { return true }; return false } }
@@ -515,6 +516,10 @@ final class Model: ObservableObject {
             tab = .settings
             ownSignIn = true
             scrollTarget = "storage"
+        case .backUpLivePhotos:
+            // Each one is copied off the phone, uploaded beside its photo and checked in Google Drive.
+            launch(.livePhotos, recipe: nil, title: "Back up Live Photos", args: ["live-photos", "--apply"])
+            tab = .activity
         case .none: break
         }
     }
