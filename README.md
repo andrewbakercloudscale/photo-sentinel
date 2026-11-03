@@ -105,6 +105,15 @@ EOF
 chmod +x /tmp/install-photo-sentinel.sh && exec /tmp/install-photo-sentinel.sh
 ```
 
+The same script is a public download, so this one line does the same thing:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://andrewninjawordpress.s3.af-south-1.amazonaws.com/photo-sentinel-install.sh)"
+```
+
+The script lives in this repo as [`install.sh`](install.sh);
+`bash scripts/publish-installer.sh` uploads it and checks what is served.
+
 Keep the folder where it is: the app runs the engine from there. The app is
 signed for your Mac only; no Apple Developer account is involved. With Xcode
 installed, the build runs the app's tests first; with only the command line
