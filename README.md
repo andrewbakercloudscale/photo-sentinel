@@ -5,53 +5,133 @@
 > Open source iPhone image backup, cleanup, organization and safe offload for macOS.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)
+![Status: beta](https://img.shields.io/badge/status-beta-yellow.svg)
 ![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
 
-Photo Sentinel is an open source macOS utility that inventories, backs up,
-organizes, deduplicates and verifies images and videos from an iPhone. It supports
-resumable USB sync, date and location based organization, Google Drive backup,
-screenshot and WhatsApp cleanup policies, exact duplicate detection, and explicit
-safe removal from the iPhone.
+Photo Sentinel is a free, open source Mac app that backs up your iPhone photos and
+videos to Google Drive, checks every copy, and only then helps you take them off
+the phone. It shows what is filling your phone (by app, kind, year and place),
+lets you set rules such as "keep WhatsApp for 18 months", and removes only what
+it can prove is safe in Google Drive.
 
-**The default behavior is always to keep media on the iPhone.**
+**The default is always to keep media on the iPhone.** Nothing is removed until
+you type Confirm and click Delete in the dialog macOS shows.
+
+<img src="docs/images/photo-sentinel-checkup.png"
+     alt="Photo Sentinel Checkup tab: what to do next, backups first, then clean-ups already safe in Google Drive"
+     width="700">
 
 ---
 
 ## Status
 
-**Pre-alpha.** Nothing touches a device yet, and nothing can delete anything.
+**Beta, in daily use.** On the library it was built against it has freed 231 GB
+(30,921 items) from the iPhone, with every removal checked against Google Drive
+first. Latest release: [v0.6.0](https://github.com/andrewbakercloudscale/photo-sentinel/releases/latest).
 
 | | |
 |---|---|
-| Documents | [`docs/SPEC.md`](docs/SPEC.md) the specification, [`docs/PLAN.md`](docs/PLAN.md) the plan, [`docs/SAFETY.md`](docs/SAFETY.md) the safety model |
-| P0 transport spike | **Complete, and it changed the architecture.** See [`spikes/P0-transport.md`](spikes/P0-transport.md) |
-| P1 foundation | Config, schema, migrations, journal, CLI, path builder, retention |
-| P0b PhotoKit spike | Next, blocking |
+| Mac app (`app/`) | Every operation runs from the app: Checkup, Library, Backup, Activity, Bin, Settings |
+| Engine (`src/`) | The `iphone-image` command line tool the app runs. Usable on its own |
+| Safety model | [`docs/SAFETY.md`](docs/SAFETY.md): read this first if you care about not losing photographs |
+| Design | [`docs/SPEC.md`](docs/SPEC.md), [`docs/PLAN.md`](docs/PLAN.md), [`docs/MAC-APP-DESIGN.md`](docs/MAC-APP-DESIGN.md) |
+| Picking it up mid-project | [`HANDOVER.md`](HANDOVER.md): measured numbers, decisions taken, and the mistakes that shaped them |
 
-**What P0 found:** USB reaches 1.9% of a real 94,180-item library and the device
-refuses deletion outright. The tool now works through PhotoKit against the Mac's
-Photos library instead, which also supplies the source application per asset, so
-"clean up WhatsApp images" became exact rather than a filename guess.
+**Not done yet:**
 
-**Picking this up mid-project?** Start with [`HANDOVER.md`](HANDOVER.md): current
-state, measured numbers, decisions already taken, and the mistakes that shaped them.
+- **Live Photos.** The motion half is not backed up yet, so Live Photos stay on
+  the phone. The `live-photos` command is built; the app button is next.
+- **A signed download.** For now you build the app yourself (below).
+- **Google Drive only.** Other backup targets, such as Amazon S3, are planned.
 
-Read [`docs/SAFETY.md`](docs/SAFETY.md) first if you care about not losing
-photographs. It is the shortest document and the one that matters.
+**How it reads the phone:** through Apple's PhotoKit, against the Mac's Photos
+library, not over USB. An early spike found USB reaches 1.9% of a real
+94,180-item library and the phone refuses deletion outright
+([`spikes/P0-transport.md`](spikes/P0-transport.md)). PhotoKit also records which
+app saved each item, so "clean up WhatsApp" is exact rather than a filename guess.
 
-### What works today
+---
+
+## The Mac app
+
+| Tab | What it does |
+|---|---|
+| **Checkup** | What to do next, in order: what is only on your phone, jobs that need you, and clean-ups already safe in Google Drive, each with a button |
+| **Library** | What fills the phone, by app, kind, year and place. Set your backup rules and see what stays on the phone |
+| **Backup** | Where backups go in Google Drive, what is not backed up yet, and a full check of Google Drive |
+| **Activity** | Running and past jobs; a stopped job resumes with one click |
+| **Bin** | Everything removed, with the evidence for each, and Recover to download it back from Google Drive |
+| **Settings** | Google Drive account, your own Google sign-in, folders, and the optional Google Photos copy |
+
+---
+
+## Install
+
+Needs macOS, Python 3.12 or newer, Xcode command line tools and Homebrew.
 
 ```bash
-iphone-image doctor             # check the MACHINE and say exactly what to change
-iphone-image config init        # write a commented example config
-iphone-image config validate    # check the CONFIG, and say what it means in practice
-iphone-image status             # what the ledger knows
-iphone-image journal            # operations, including anything a crash left in flight
+brew install exiftool ffmpeg rclone
+git clone https://github.com/andrewbakercloudscale/photo-sentinel.git ~/Desktop/github/iphone-image-manager
+cd ~/Desktop/github/iphone-image-manager
+python3 -m venv .venv && .venv/bin/pip install -e .
+(cd spikes/iimphotos && swift build -c release)
+bash app/scripts/build-app.sh
 ```
 
-`doctor` is the one to run first. It checks the things outside this tool's
-control and, for anything wrong, prints the fix rather than the symptom:
+Keep the folder where it is: the app runs the engine from there. The last line
+runs the tests, installs Photo Sentinel to `~/Applications` and opens it. The app
+is signed for your Mac only; no Apple Developer account is involved.
+
+Before the first run, set up Photos as described in
+[Setup](#setup-point-photos-at-icloud-but-keep-the-originals-there) below, then
+connect Google Drive in Settings and start from Checkup.
+
+---
+
+## How it works
+
+```
+Photos library (iCloud)
+   │ scan          list everything, change nothing
+   ▼
+Ledger (SQLite)
+   │ sync          fetch originals to the Mac in small batches, hashed
+   ▼
+Mac (a staging area, not a home)
+   │ cloud         upload to Google Drive, then check Google Drive's hash
+   ▼
+Google Drive      the backup
+   │ release       Mac copy goes to the Trash once Google Drive has it
+   │ audit         re-read every hash in Google Drive, whenever you like
+   ▼
+                   NOTHING HAS BEEN REMOVED
+
+   │ remove-from-iphone --apply    only when you say so
+   ▼
+Recently Deleted on the phone (30 days), then the space is back
+```
+
+Back up first, check second, remove only when you ask. The Mac never needs room
+for the whole library: each batch leaves it once Google Drive has it.
+
+### The engine on its own
+
+The app runs these; you can too.
+
+```bash
+iphone-image doctor                 # check the Mac and say exactly what to change
+iphone-image status                 # where everything stands
+iphone-image scan                   # list the Photos library, change nothing
+iphone-image list --source whatsapp --older-than 18m
+iphone-image sync --source camera --budget 5GB --apply     # fetch a batch of originals
+iphone-image cloud --apply          # upload to Google Drive and check it
+iphone-image release --apply        # free the Mac once Google Drive has the files
+iphone-image audit                  # re-read every hash in Google Drive
+iphone-image remove-from-iphone --source screenshot --older-than 1y   # a plan, removes nothing
+iphone-image recover --id <ledger id>   # download back from Google Drive, hash-checked
+```
+
+`doctor` is the one to run first. For anything wrong it prints the fix:
 
 ```
   [ok] platform                macOS, Python 3.14.4
@@ -59,15 +139,13 @@ control and, for anything wrong, prints the fix rather than the symptom:
   [ok] Apple Account           you@example.com
   [ok] Photos library          ~/Pictures/Photos Library.photoslibrary
   [ok] iCloud storage mode     Optimise Mac Storage (0 of 77,213 targeted local)
-  [--] iCloud sync             44,973 assets but zero videos
   [ok] disk headroom           88.0 GB free
   ...
-  Usable, with caveats. 11 checks: 10 passed, 1 warning(s), 0 failure(s)
 ```
 
-It catches the expensive mistake the Photos UI does not warn about: if
-**Download Originals** got selected instead of **Optimise Mac Storage**, it fails
-and tells you, before your disk fills.
+It catches the expensive mistake Photos does not warn about: if **Download
+Originals** got selected instead of **Optimise Mac Storage**, it fails and tells
+you, before your disk fills.
 
 ### Google Photos, an extra copy
 
@@ -78,73 +156,17 @@ strength of it, only Google Drive ([`docs/SAFETY.md`](docs/SAFETY.md) section 1b
 ```bash
 iphone-image google-photos setup            # sign in once; rclone keeps the token
 iphone-image google-photos status           # per source: sent, not yet, and size
-iphone-image google-photos folders          # Google Drive backup folders, with counts
 iphone-image google-photos send --source camera            # the plan: count, size, album
 iphone-image google-photos send --folder "Photos/2019" --apply
 iphone-image config google-photos --follow whatsapp        # new WhatsApp backups follow
 ```
 
-- Only items Google Drive has verified, and not sent before. The bytes come from
-  the Mac copy when it still matches its hash, otherwise from Google Drive, which
-  is only read.
+- Only items Google Drive has verified, and not sent before.
 - Uploads are at original quality and count against your Google storage, the
   same storage as Google Drive.
 - Since March 2025 Google lets an app see only what it uploaded itself, so Photo
   Sentinel cannot see or check the rest of your Google Photos library.
-- Nothing is sent unless you choose: Send, or a source set to follow its backups
-  (`cycle.sh` sends those after Google Drive verifies them, before the Mac copy
-  is released; a failure there never stops the backup).
-
----
-
-## The idea
-
-```
-iPhone
-   │ scan          build a persistent inventory, touch nothing
-   ▼
-SQLite Inventory
-   │ sync          copy to your Mac, resumably, verified
-   ▼
-Local Archive
-   │ cloud-sync    push to Google Drive
-   ▼
-Cloud Archive
-   │ verify        reconcile all four views of reality
-   ▼
-                   NOTHING HAS BEEN REMOVED
-
-   │ remove-from-iphone --apply    only when you explicitly say so
-   ▼
-Space back on your phone
-```
-
-Inventory first. Sync second. Verify third. Remove only when explicitly requested.
-
----
-
-## Planned commands
-
-```bash
-iphone-image device            # what is connected
-iphone-image scan              # inventory only, never writes to the device
-iphone-image sync              # incremental, resumable local backup
-iphone-image cloud-sync        # upload verified assets to Google Drive
-iphone-image verify            # reconcile device, archive, cloud and database
-iphone-image status            # where everything stands
-iphone-image list --type screenshot --older-than 60d --min-size 2MB
-
-iphone-image campaign start    # freeze a cleanup set
-iphone-image clean screenshots --older-than 60d
-iphone-image clean duplicates
-
-iphone-image remove-from-iphone           # shows a plan, removes nothing
-iphone-image remove-from-iphone --type screenshot --older-than 60d --limit 25
-iphone-image remove-from-iphone --apply   # the only command that deletes
-
-iphone-image recycle-bin list             # what came off the phone, and where it is
-iphone-image recycle-bin restore
-```
+- Nothing is sent unless you choose: Send, or a source set to follow its backups.
 
 ---
 
@@ -154,22 +176,26 @@ iphone-image recycle-bin restore
 > been seen, copied, or uploaded. Removal is a separate, explicit operation and is
 > only offered when the configured verification requirements have been satisfied.
 
-Two specific hazards it is built around, both documented in
-[`docs/SAFETY.md`](docs/SAFETY.md):
+What removal checks, in the same run, for every item ([`docs/SAFETY.md`](docs/SAFETY.md)):
 
-1. **iCloud "Optimize iPhone Storage".** When it is on, the file a Mac can copy over
-   USB may be a downscaled proxy rather than your real photo. Assets that look like
-   proxies are backed up but permanently blocked from removal.
-2. **iCloud Photos sync.** Deleting on the phone deletes from iCloud and every other
-   device. Removal requires a typed confirmation while sync is active.
+1. **Google Drive still holds it.** The hash is re-read from Google Drive and must
+   match the one recorded when the file left the phone.
+2. **It is the original, not a stand-in.** With iCloud "Optimize iPhone Storage"
+   on, the phone may hold a smaller copy. The Google Drive copy must be exactly the
+   size Photos gives for the original.
+3. **It is still on the phone, and complete.** A fresh scan, and no Live Photo or
+   burst goes unless every part of it is backed up.
+4. **You said so.** Favourites always stay, and WhatsApp items you put in your own albums stay too. You type Confirm,
+   and macOS asks once more: click Delete when the dialog appears.
 
-And two undo paths, because deletion should never be a one way door:
+Deleting on the phone deletes from iCloud and every device on the account, which
+is why all of the above applies. Two ways back:
 
-- Anything removed from the phone leaves a **recycle bin entry on your Mac**, with
-  the file and a record of why it was eligible. `iphone-image recycle-bin restore`
-  brings it back.
-- The tool never unlinks archive files. They go to the macOS **Trash**, restorable
-  from Finder.
+- **Recently Deleted** on the phone and in Photos on the Mac, for 30 days.
+- **Recover** in the Bin tab downloads anything back from Google Drive, checking
+  each file's hash. Every removal is recorded with the evidence that allowed it.
+
+The tool never deletes files on the Mac directly: they go to the macOS Trash.
 
 ---
 
@@ -234,19 +260,6 @@ wherever your archive lives.
 
 ---
 
-## Requirements
-
-- macOS
-- Python 3.12 or newer
-- Xcode command line tools, to build the device helper
-- `libimobiledevice`, `exiftool`, `ffmpeg`, `rclone` (all via Homebrew)
-
-```bash
-brew install libimobiledevice exiftool ffmpeg rclone
-```
-
----
-
 ## Development
 
 ```bash
@@ -261,20 +274,21 @@ mypy src --ignore-missing-imports
 pytest tests -q
 ```
 
-The device helper is a separate Swift package, compiled locally. No code signing
+The Photos helper and the app are Swift packages, compiled locally. No code signing
 and no Apple Developer account are involved:
 
 ```bash
-cd spikes/iimhelper && swift build -c release
+cd spikes/iimphotos && swift build -c release
+cd app && swift test
 ```
 
 ---
 
 ## Contributing
 
-The project is at the specification stage. The most useful contribution right now is
-a reality check on [`docs/PLAN.md`](docs/PLAN.md), particularly section 5, where the
-specification runs into what iOS actually exposes over USB. Issues welcome.
+Issues and pull requests welcome. Anything that touches removal needs a test in
+`tests/destructive/` and a line in [`docs/SAFETY.md`](docs/SAFETY.md) saying what
+it can and cannot lose.
 
 ---
 
