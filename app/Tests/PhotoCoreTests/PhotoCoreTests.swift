@@ -429,6 +429,42 @@ final class JobsTests: XCTestCase {
         XCTAssertEqual(j.step, "uploading to S3, \(Fmt.count(1585)) of \(Fmt.count(11602)) files")
     }
 
+    /// Add S3 bucket, through the real CLI with a stand-in rclone: the account is added and named
+    /// back, and a refusal comes back as its own words. The secret never goes on a command line.
+    func testAddS3GoesThroughTheEngine() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("adds3-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let conf = dir.appendingPathComponent("rclone.conf").path
+        let calls = dir.appendingPathComponent("calls").path
+        let script = """
+        #!/bin/sh
+        echo "$@" >> '\(calls)'
+        case "$1" in
+          config) [ "$2" = file ] && echo '\(conf)' ;;
+          listremotes) echo "gdrive: drive" ;;
+          rcat) cat > /dev/null ;;
+          lsjson) echo '[{"Path":".photo-sentinel-check","Hashes":{"md5":"abababababababababababababababab"}}]' ;;
+        esac
+        exit 0
+        """
+        let rclone = dir.appendingPathComponent("rclone").path
+        try script.write(toFile: rclone, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: rclone)
+        let path = ProcessInfo.processInfo.environment["PATH"] ?? ""
+        setenv("PATH", dir.path + ":" + path, 1)
+        defer { setenv("PATH", path, 1) }
+
+        let engine = CLIEngine()
+        let remote = try engine.addS3(name: "photos", bucket: "my-bucket", keyId: "AKIA", secret: "top,secret", region: "eu-west-1", endpoint: "")
+        XCTAssertEqual(remote, "photos")
+        XCTAssertTrue(try String(contentsOfFile: conf, encoding: .utf8).contains("[photos]\ntype = alias"))
+        XCTAssertFalse(try String(contentsOfFile: calls, encoding: .utf8).contains("top,secret"))
+        XCTAssertThrowsError(try engine.addS3(name: "gdrive", bucket: "b", keyId: "k", secret: "s", region: "", endpoint: "")) { e in
+            XCTAssertTrue((e as? JobError)?.text.contains("already an account") == true, "\(e)")
+        }
+    }
+
     func testARunSaysWhatItDid() {
         let run = """
             [10-27 11:27:19] [screenshot/photo] starting: 40 cycle(s), 137 left to fetch, 61.8 GB free

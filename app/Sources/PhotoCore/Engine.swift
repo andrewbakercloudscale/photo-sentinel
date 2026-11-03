@@ -301,6 +301,17 @@ extension CLIEngine {
         if let e = obj?["error"] as? String { throw JobError.message(e) }
     }
 
+    /// Adds an S3 bucket as a backup account, kept only if a test file can be written there and
+    /// its MD5 read back. Does not choose it for backups. The secret goes in the environment.
+    public func addS3(name: String, bucket: String, keyId: String, secret: String, region: String, endpoint: String) throws -> String {
+        var args = ["--json", "config", "add-s3", "--name", name, "--bucket", bucket, "--access-key-id", keyId, "--region", region]
+        if !endpoint.isEmpty { args += ["--endpoint", endpoint] }
+        let obj = try JSONSerialization.jsonObject(with: run(args, env: ["IPHONE_IMAGE_S3_SECRET": secret])) as? [String: Any]
+        if let e = obj?["error"] as? String { throw JobError.message(e) }
+        guard let remote = obj?["remote"] as? String else { throw JobError.message("the S3 account was not added") }
+        return remote
+    }
+
     /// The Google Drive web address of `folder` in the backup account.
     public func folderLink(_ folder: String) throws -> URL {
         let obj = try JSONSerialization.jsonObject(with: run(["--json", "config", "folder-link", folder])) as? [String: Any]

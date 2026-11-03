@@ -10,6 +10,7 @@ their hash.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import subprocess
@@ -84,9 +85,9 @@ def parse_remotes(text: str) -> list[Account]:
     return found
 
 
-def accounts(binary: str = "rclone") -> list[Account]:
+def accounts(binary: str = "rclone", run=subprocess.run) -> list[Account]:
     try:
-        out = subprocess.run(
+        out = run(
             [binary, "listremotes", "--long"],
             capture_output=True,
             text=True,
@@ -95,7 +96,34 @@ def accounts(binary: str = "rclone") -> list[Account]:
         ).stdout
     except (OSError, subprocess.SubprocessError):
         return []
-    return parse_remotes(out)
+    return resolve_aliases(parse_remotes(out), binary, run)
+
+
+def alias_backend(target: str, kinds: dict[str, str]) -> str | None:
+    """The backend an alias points at: `:s3,provider=AWS,...:bucket` is s3, and
+    `other:folder` is whatever `other` is. None when it cannot be told."""
+    if target.startswith(":"):
+        head = target[1:].split(",", 1)[0].split(":", 1)[0].strip()
+        return head or None
+    name, sep, _ = target.partition(":")
+    return kinds.get(name.strip()) if sep else None
+
+
+def resolve_aliases(
+    found: list[Account], binary: str = "rclone", run=subprocess.run
+) -> list[Account]:
+    """An alias reports as `alias`; it is listed as the backend it points at, whose
+    hashes its listings carry. An "Add S3 account" bucket is such an alias."""
+    kinds = {a.name: a.kind for a in found}
+    resolved = []
+    for a in found:
+        if a.kind == "alias":
+            target = (_config_show(a.name, binary, run) or {}).get("remote", "")
+            backend = alias_backend(target, kinds)
+            if backend and backend != "alias":
+                a = Account(a.name, backend)
+        resolved.append(a)
+    return resolved
 
 
 def shared_client_id(remote: str, binary: str = "rclone") -> bool | None:
@@ -284,11 +312,14 @@ def _config_show(name: str, binary: str, run) -> dict[str, str] | None:
     return found
 
 
-def _config_file(binary: str, run) -> Path:
+def _config_file(
+    binary: str, run, error: type[Exception] = OwnClientError, create: bool = False
+) -> Path:
+    """The rclone config file. With `create`, one that does not exist yet is fine."""
     out = run([binary, "config", "file"], capture_output=True, text=True, timeout=20)
     lines = [ln.strip() for ln in out.stdout.splitlines() if ln.strip()]
-    if out.returncode != 0 or not lines or not Path(lines[-1]).is_file():
-        raise OwnClientError("could not find the rclone config file, so nothing was changed.")
+    if out.returncode != 0 or not lines or not (create or Path(lines[-1]).is_file()):
+        raise error("could not find the rclone config file, so nothing was changed.")
     return Path(lines[-1])
 
 
@@ -379,3 +410,107 @@ def _same_drive(before: dict[str, str] | None, after: dict[str, str], destinatio
             f"that Google Drive has no {top[0]} folder, so it is not the one holding your "
             "backups. Sign in as the Google account your backups are in. Nothing was changed."
         )
+
+
+class AddS3Error(Exception):
+    """Why an S3 account was not added. The rclone config is left as it was."""
+
+
+#: Written to the bucket and deleted again to prove the keys can upload.
+S3_PROBE = ".photo-sentinel-check"
+
+
+def _quoted(value: str) -> str:
+    """A connection string value: quoted, with a quote doubled, so commas and colons pass."""
+    return '"' + value.replace('"', '""') + '"'
+
+
+def s3_target(bucket: str, access_key_id: str, secret: str, region: str, endpoint: str = "") -> str:
+    """The alias target: an S3 connection string rooted at the bucket (and folder)."""
+    params = [
+        "s3",
+        f"provider={'Other' if endpoint else 'AWS'}",
+        f"access_key_id={_quoted(access_key_id)}",
+        f"secret_access_key={_quoted(secret)}",
+        f"region={_quoted(region)}",
+    ]
+    if endpoint:
+        params.append(f"endpoint={_quoted(endpoint)}")
+    return ":" + ",".join(params) + ":" + bucket.strip("/")
+
+
+def add_s3(
+    name: str,
+    bucket: str,
+    access_key_id: str,
+    secret: str,
+    region: str = "us-east-1",
+    endpoint: str = "",
+    binary: str = "rclone",
+    run=subprocess.run,
+) -> dict[str, object]:
+    """Add an S3 bucket as a backup account, without Terminal.
+
+    The account is an rclone alias rooted at the bucket, so backup folders land
+    inside it, and it is listed as S3 (checked by MD5). The keys go straight into
+    the rclone config file, never onto a command line where `ps` shows them. The
+    account is kept only if a small file can be written to the bucket, read back
+    and deleted; otherwise the config file is put back as it was.
+    """
+    name, bucket = name.strip().rstrip(":"), bucket.strip().strip("/")
+    access_key_id, secret = access_key_id.strip(), secret.strip()
+    region, endpoint = region.strip() or "us-east-1", endpoint.strip()
+    if not name or not all(c.isalnum() or c in "-_" for c in name):
+        raise AddS3Error("the account name may use only letters, digits, - and _.")
+    if not bucket:
+        raise AddS3Error("the bucket name is empty.")
+    if not access_key_id or not secret:
+        raise AddS3Error("both the access key ID and the secret access key are needed.")
+    if endpoint and not endpoint.startswith(("https://", "http://")):
+        endpoint = "https://" + endpoint
+    if any(a.name == name for a in accounts(binary, run)):
+        raise AddS3Error(f"there is already an account called {name}. Pick another name.")
+
+    conf = _config_file(binary, run, AddS3Error, create=True)
+    before = conf.read_bytes() if conf.exists() else None
+    if before is not None and before.lstrip().startswith(b"RCLONE_ENCRYPT"):
+        raise AddS3Error("your rclone config is encrypted, so add the account with rclone config.")
+    text = (before or b"").decode()
+    target = s3_target(bucket, access_key_id, secret, region, endpoint)
+    section = f"\n[{name}]\ntype = alias\nremote = {target}\n"
+    conf.parent.mkdir(parents=True, exist_ok=True)
+    conf.write_text(text.rstrip("\n") + ("\n" if text.strip() else "") + section)
+    conf.chmod(0o600)
+
+    def undo(why: str) -> AddS3Error:
+        if before is None:
+            conf.unlink(missing_ok=True)
+        else:
+            conf.write_bytes(before)
+        return AddS3Error(why + " Nothing was added.")
+
+    probe = f"{name}:{S3_PROBE}"
+    try:
+        wrote = run(
+            [binary, "rcat", probe], input="ok\n", capture_output=True, text=True, timeout=60
+        )
+        if wrote.returncode != 0:
+            said = (wrote.stderr or "").strip().splitlines()
+            raise undo(
+                "the bucket could not be written to"
+                + (f": {said[-1]}" if said else ".")
+                + " Check the bucket name, region and keys, and that the keys may upload."
+            )
+        read = run([binary, "lsjson", "--hash", probe], capture_output=True, text=True, timeout=60)
+        rows = json.loads(read.stdout) if read.returncode == 0 and read.stdout.strip() else []
+        if not any((r.get("Hashes") or {}).get("md5") for r in rows if isinstance(r, dict)):
+            raise undo(
+                "the test file was written but S3 did not report its MD5, so backups "
+                "there could not be checked."
+            )
+    except (OSError, subprocess.SubprocessError, ValueError) as e:
+        raise undo(f"rclone could not reach the bucket: {e}.") from None
+    finally:
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            run([binary, "deletefile", probe], capture_output=True, text=True, timeout=60)
+    return {"remote": name, "kind": "s3", "bucket": bucket, "endpoint": endpoint, "region": region}

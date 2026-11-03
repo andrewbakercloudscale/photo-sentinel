@@ -3,7 +3,8 @@ import PhotoCore
 import SwiftUI
 
 /// Settings: which account backups go to, which folders in it, and the archive folder on
-/// this Mac. Accounts are rclone remotes; adding one is `rclone config`, opened in Terminal.
+/// this Mac. Accounts are rclone remotes. An S3 bucket is added here; anything else is
+/// `rclone config`, opened in Terminal.
 struct StorageCard: View {
     @ObservedObject var model: Model
     @State private var account = ""
@@ -14,6 +15,9 @@ struct StorageCard: View {
     @State private var clientId = ""
     @State private var clientSecret = ""
     @State private var signingIn = false
+    @State private var showS3 = false
+    @State private var s3 = S3Form()
+    @State private var addingS3 = false
 
     var body: some View {
         Card(title: "Where backups go", symbol: "externaldrive.fill.badge.icloud", tint: Tab.backup.color) {
@@ -31,10 +35,14 @@ struct StorageCard: View {
                                     }
                                 }
                                 .labelsHidden().fixedSize()
-                                CapsuleButton(title: "Add an account…", symbol: "plus.circle.fill", color: Tab.backup.color, style: .ghost) {
+                                CapsuleButton(title: "Add S3 bucket…", symbol: "plus.circle.fill", color: Tab.backup.color, style: .ghost) {
+                                    showS3 = true
+                                }
+                                .help("Add an Amazon S3 bucket, or an S3 compatible one such as Backblaze B2 or Cloudflare R2, with its access keys.")
+                                CapsuleButton(title: "Other…", symbol: "terminal", color: .secondary, style: .ghost) {
                                     Self.openRcloneConfig()
                                 }
-                                .help("Opens Terminal with rclone's own setup. It signs in to the account in your browser and keeps the credentials; Photo Sentinel never sees them. Come back and pick the new account here.")
+                                .help("Opens Terminal with rclone's own setup, for any other account. Come back and pick the new account here.")
                             }
                         }
                         GridRow(alignment: .top) {
@@ -63,6 +71,7 @@ struct StorageCard: View {
                         }
                     }
                     .font(.callout)
+                    if showS3 { s3Form() }
                     if s.sharedClientId == true { clientIdHint(s) }
                     if changed(s) { pending(s) }
                     if let m = message {
@@ -182,6 +191,61 @@ struct StorageCard: View {
         }
     }
 
+    @ViewBuilder private func s3Form() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add an S3 bucket").fontWeight(.medium)
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 6) {
+                GridRow { Text("Bucket"); TextField("my-bucket, or my-bucket/iphone", text: $s3.bucket).textFieldStyle(.roundedBorder) }
+                GridRow { Text("Access key ID"); TextField("AKIA…", text: $s3.keyId).textFieldStyle(.roundedBorder).font(.callout.monospaced()) }
+                GridRow { Text("Secret access key"); SecureField("", text: $s3.secret).textFieldStyle(.roundedBorder).font(.callout.monospaced()) }
+                GridRow { Text("Region"); TextField("us-east-1", text: $s3.region).textFieldStyle(.roundedBorder) }
+                GridRow { Text("Endpoint"); TextField("Leave empty for Amazon S3", text: $s3.endpoint).textFieldStyle(.roundedBorder) }
+                GridRow { Text("Call it"); TextField("s3", text: $s3.name).textFieldStyle(.roundedBorder) }
+            }
+            Text("Photo Sentinel writes a small test file to the bucket, checks S3 reports its fingerprint (MD5), and deletes it. The account is added only if that works. The keys are kept in rclone's settings on this Mac, like your Google Drive sign-in. Adding it does not move backups: pick it under Account and Save.")
+                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                CapsuleButton(title: addingS3 ? "Checking the bucket…" : "Add bucket", symbol: "checkmark", color: Tab.backup.color) {
+                    Task { await addS3() }
+                }
+                .disabled(addingS3 || !s3.ready)
+                if addingS3 { ProgressView().controlSize(.small) }
+                CapsuleButton(title: "Cancel", color: .secondary, style: .ghost) {
+                    showS3 = false
+                    s3 = S3Form()
+                }
+                .disabled(addingS3)
+            }
+        }
+        .font(.callout)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.06)))
+    }
+
+    private func addS3() async {
+        addingS3 = true
+        message = nil
+        let engine = model.engine
+        let f = s3
+        let result = await Task.detached {
+            Result { try engine.addS3(name: f.name, bucket: f.bucket, keyId: f.keyId, secret: f.secret, region: f.region, endpoint: f.endpoint) }
+        }.value
+        addingS3 = false
+        switch result {
+        case .success(let remote):
+            showS3 = false
+            s3 = S3Form()
+            message = (true, "Added \(remote). To send new backups there, pick it under Account and Save.")
+            if let r = await Task.detached(operation: { try? engine.storage() }).value {
+                model.storage = r
+                account = remote
+            }
+        case .failure(let e):
+            s3.secret = ""
+            message = (false, "Not added: \((e as? JobError)?.text ?? "\(e)")")
+        }
+    }
+
     private func changed(_ s: StorageReport) -> Bool {
         account != s.remote || NSString(string: archive).expandingTildeInPath != s.archive
     }
@@ -244,6 +308,19 @@ struct StorageCard: View {
     static func openRcloneConfig() {
         let script = "tell application \"Terminal\" to activate\ntell application \"Terminal\" to do script \"rclone config\""
         NSAppleScript(source: script)?.executeAndReturnError(nil)
+    }
+}
+
+/// What the Add S3 bucket form holds. Ready once the bucket and both keys are filled in.
+struct S3Form: Equatable {
+    var bucket = ""
+    var keyId = ""
+    var secret = ""
+    var region = "us-east-1"
+    var endpoint = ""
+    var name = "s3"
+    var ready: Bool {
+        ![bucket, keyId, secret, name].contains { $0.trimmingCharacters(in: .whitespaces).isEmpty }
     }
 }
 

@@ -588,6 +588,48 @@ def config_own_client(ctx: Context, client_id: str) -> None:
     )
 
 
+@config.command("add-s3")
+@click.option("--name", default="s3", show_default=True, help="What to call the account.")
+@click.option("--bucket", required=True, help="The bucket, or bucket/folder.")
+@click.option("--access-key-id", required=True, help="The access key ID.")
+@click.option("--region", default="us-east-1", show_default=True, help="The bucket's region.")
+@click.option(
+    "--endpoint", default="", help="For S3 compatible services (Backblaze, Cloudflare R2, MinIO)."
+)
+@pass_context
+def config_add_s3(
+    ctx: Context, name: str, bucket: str, access_key_id: str, region: str, endpoint: str
+) -> None:
+    """Add an S3 bucket as a backup account.
+
+    The secret access key is read from IPHONE_IMAGE_S3_SECRET, or asked for,
+    never taken as an argument. The account is kept only if a test file can be
+    written to the bucket and its MD5 read back. It is not chosen for backups:
+    pick it in `config storage --remote`.
+    """
+    from .. import storage
+
+    secret = os.environ.get("IPHONE_IMAGE_S3_SECRET") or click.prompt(
+        "Secret access key", hide_input=True
+    )
+    try:
+        done = storage.add_s3(name, bucket, access_key_id, secret, region, endpoint)
+    except storage.AddS3Error as e:
+        _fail(ctx.out, f"Not added: {e}")
+        return
+    ctx.out.result(
+        done,
+        lambda: ctx.out.pairs(
+            [
+                ("account", f"{done['remote']} (S3, checked by MD5)"),
+                ("bucket", str(done["bucket"])),
+                ("checked", "a test file was written, its MD5 read back, and deleted"),
+                ("next", f"config storage --remote {done['remote']} --apply"),
+            ]
+        ),
+    )
+
+
 @config.command("storage")
 @click.option("--remote", default=None, help="The rclone account new backups go to.")
 @click.option("--archive", default=None, help="The folder on this Mac files are copied into.")
@@ -612,13 +654,13 @@ def config_storage(ctx: Context, remote: str | None, archive: str | None, apply_
     if remote is not None and remote != c.cloud.remote:
         chosen = next((a for a in found if a.name == remote), None)
         if chosen is None:
-            _fail(ctx.out, f"no rclone account named {remote!r}. Add it with `rclone config`.")
+            _fail(ctx.out, f"no account named {remote!r}. Add one in Settings, Where backups go.")
             return
         if not chosen.can_verify:
             _fail(
                 ctx.out,
-                f"{chosen.title} does not report SHA-256, so a backup there could never be "
-                "checked before removal. Only Google Drive can be used for now.",
+                f"{chosen.title} reports no hash Photo Sentinel can check, so a backup there could "
+                "never be checked before removal. Use Google Drive, S3 or a folder on this Mac.",
             )
             return
         cloud_changes["remote"] = remote

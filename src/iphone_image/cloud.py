@@ -40,7 +40,7 @@ from .digests import file_digests
 from .journal import Journal, Op
 from .logs import get_logger
 from .selector import Selector, channel_of
-from .storage import hash_for, parse_remotes
+from .storage import hash_for, parse_remotes, resolve_aliases
 
 log = get_logger("cloud")
 
@@ -359,7 +359,7 @@ class RcloneProvider:
             ) from exc
         if result.returncode != 0:
             raise CloudError(f"rclone failed: {result.stderr.strip() or 'no diagnostic'}")
-        kinds = {a.name: a.kind for a in parse_remotes(result.stdout)}
+        kinds = {a.name: a.kind for a in resolve_aliases(parse_remotes(result.stdout), self.binary)}
         if self.remote not in kinds:
             raise CloudError(
                 f"rclone has no remote called {self.remote!r}. "
