@@ -60,7 +60,7 @@ public struct Job: Identifiable, Hashable, Sendable {
         let n = Fmt.count
         var parts: [String] = []
         if done.fetched > 0 { parts.append("\(n(done.fetched)) copied from Photos (\(Fmt.bytes(done.fetchedBytes)))") }
-        if done.verified > 0 { parts.append("\(n(done.verified)) checked in Google Drive") }
+        if done.verified > 0 { parts.append("\(n(done.verified)) checked in \(Backup.name)") }
         if done.released > 0 { parts.append("\(n(done.released)) Mac copies tidied (\(Fmt.bytes(done.freedBytes)) freed)") }
         if parts.isEmpty { return state == .finished ? "Nothing new: everything was already backed up" : "Nothing finished yet" }
         return (state == .finished ? "Did: " : "So far: ") + parts.joined(separator: ", ")
@@ -126,10 +126,10 @@ public struct Job: Identifiable, Hashable, Sendable {
         case .uploading:
             let of = batch.flatMap { $0.of > 1 ? " (batch \($0.at) of \($0.of))" : nil } ?? ""
             guard let uploaded, let toUpload else {
-                guard let c = uploadCandidates else { return "uploading to Google Drive" }
-                return "uploading to Google Drive: checking which of the \(n(c)) are already there\(of)"
+                guard let c = uploadCandidates else { return "uploading to \(Backup.name)" }
+                return "uploading to \(Backup.name): checking which of the \(n(c)) are already there\(of)"
             }
-            var text = "uploading to Google Drive, \(n(uploaded)) of \(n(toUpload)) files\(of)"
+            var text = "uploading to \(Backup.name), \(n(uploaded)) of \(n(toUpload)) files\(of)"
             if let rate = uploadRate {
                 text += ", about \(n(Int(rate.rounded()))) a minute"
                 let hours = Double(max(0, toUpload - uploaded)) / rate / 60
@@ -139,7 +139,7 @@ public struct Job: Identifiable, Hashable, Sendable {
         case .fetching:
             guard let left else { return "copying from Photos" }
             return left == 0 ? "copying the last items from Photos" : "copying from Photos, \(n(left)) left"
-        case .releasing: return "tidying the Mac copies already in Google Drive"
+        case .releasing: return "tidying the Mac copies already in \(Backup.name)"
         case .googlePhotos: return "sending a copy to Google Photos"
         case .other: return nil
         }
@@ -257,7 +257,7 @@ public enum Jobs {
         if m.contains("EMPTY THE BIN") { return "Not enough disk space: empty the Bin or free some space, then resume." }
         if m.hasPrefix("release failed") { return "Tidying the Mac copies failed. Read cycle.log before resuming." }
         if m.hasPrefix("NOT DONE"), let n = m.split(separator: " ").dropFirst(2).first {
-            return "\(n) were copied from Photos but did not reach Google Drive. Resume to upload them; what got there is kept."
+            return "\(n) were copied from Photos but did not reach \(Backup.name). Resume to upload them; what got there is kept."
         }
         return m
     }

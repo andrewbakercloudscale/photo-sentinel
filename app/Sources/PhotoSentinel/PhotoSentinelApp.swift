@@ -180,7 +180,7 @@ struct Header: View {
                 }
             }
             .buttonStyle(.plain)
-            .help("Each round copies a chunk out of Photos, uploads it to Google Drive and checks it. This is the step under way. Click for details.")
+            .help("Each round copies a chunk out of Photos, uploads it to \(Backup.name) and checks it. This is the step under way. Click for details.")
         } else {
             Pill(text: "No job running", symbol: "moon.zzz.fill", color: .secondary)
         }

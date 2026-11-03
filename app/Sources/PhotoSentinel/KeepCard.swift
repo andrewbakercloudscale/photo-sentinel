@@ -78,7 +78,7 @@ struct KeepCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 HStack(spacing: 16) {
                     legend(Tab.library.color.opacity(0.35), "Stays: \(Fmt.bytes(after))")
-                    legend(Theme.good, "Already in Google Drive, can go now: \(Fmt.bytes(today))")
+                    legend(Theme.good, "Already in \(Backup.name), can go now: \(Fmt.bytes(today))")
                     legend(Theme.warn, "Back up first: \(Fmt.bytes(later))")
                 }
                 .font(.caption)
@@ -91,7 +91,7 @@ struct KeepCard: View {
                 .sectionLabel()
                 ForEach(Self.kinds, id: \.self) { kind in row(kind) }
                 rules
-                Text("Favourites, your own albums and anything not yet checked in Google Drive always stay. Removing shows the exact plan first.")
+                Text("Favourites, your own albums and anything not yet checked in \(Backup.name) always stay. Removing shows the exact plan first.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -145,7 +145,7 @@ struct KeepCard: View {
                         Text(r.recipe.filter.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                     Spacer()
-                    Text("frees \(Fmt.bytes(r.selected.bytes)) · \(Fmt.bytes(r.removableNow.bytes)) already in Google Drive")
+                    Text("frees \(Fmt.bytes(r.selected.bytes)) · \(Fmt.bytes(r.removableNow.bytes)) already in \(Backup.name)")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     RowButton(title: "Edit", symbol: "slider.horizontal.3", color: Tab.library.color) {
                         model.draft = r.recipe.filter
@@ -181,12 +181,12 @@ struct KeepCard: View {
                 ForEach(Self.ages, id: \.self) { Text(words($0)).tag($0) }
             }
             .labelsHidden().fixedSize().frame(width: 170, alignment: .leading)
-            .help("Keep this much on the phone. Older items can come off once Google Drive has them.")
+            .help("Keep this much on the phone. Older items can come off once \(Backup.name) has them.")
             VStack(alignment: .leading, spacing: 3) {
                 StackBar(parts: [(color(kind).opacity(0.35), Double(max(total.bytes - frees, 0))),
                                  (Theme.good, Double(r?.removableNow.bytes ?? 0)), (Theme.warn, Double(r?.notBackedUp.bytes ?? 0))], height: 8)
                     .clipShape(Capsule())
-                Text(r.map { "frees \(Fmt.bytes($0.selected.bytes)) · \(Fmt.bytes($0.removableNow.bytes)) already in Google Drive · \(Fmt.bytes($0.notBackedUp.bytes)) to back up first" }
+                Text(r.map { "frees \(Fmt.bytes($0.selected.bytes)) · \(Fmt.bytes($0.removableNow.bytes)) already in \(Backup.name) · \(Fmt.bytes($0.notBackedUp.bytes)) to back up first" }
                      ?? "keeps all \(Fmt.bytes(total.bytes))")
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
             }
@@ -194,11 +194,11 @@ struct KeepCard: View {
             HStack(spacing: 6) {
                 if let r, r.notBackedUp.count > 0 {
                     RowButton(title: "Back up", symbol: "icloud.and.arrow.up.fill", color: Tab.backup.color) { model.backUp(r.recipe) }
-                        .help("Copy \(Fmt.bytes(r.notBackedUp.bytes)) to Google Drive. Nothing leaves the phone.")
+                        .help("Copy \(Fmt.bytes(r.notBackedUp.bytes)) to \(Backup.name). Nothing leaves the phone.")
                 }
                 if let r, r.selected.count > 0 {
                     RowButton(title: "Back up & remove…", symbol: "iphone.and.arrow.forward", style: .fill) { model.removing = r.recipe }
-                        .help("Backs up what Google Drive doesn't have yet, then removes from the iPhone only what Google Drive has checked. You see the plan first.")
+                        .help("Backs up what \(Backup.name) doesn't have yet, then removes from the iPhone only what \(Backup.name) has checked. You see the plan first.")
                 }
             }
             .fixedSize().frame(minWidth: 250, alignment: .trailing)

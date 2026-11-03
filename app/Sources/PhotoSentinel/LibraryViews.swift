@@ -119,7 +119,7 @@ struct BackupView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         // Most still to back up first.
                         ForEach(s.channels.sorted { $0.total.bytes - $0.verified.bytes > $1.total.bytes - $1.verified.bytes }) { c in CoverageRow(model: model, stats: c) }
-                        Text("A backup copies to Google Drive and checks each file's hash. Nothing is removed from the phone by a backup. One runs at a time; the rest wait their turn.")
+                        Text("A backup copies to \(Backup.name) and checks each file's hash. Nothing is removed from the phone by a backup. One runs at a time; the rest wait their turn.")
                             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -142,15 +142,15 @@ struct BinView: View {
                 }
                 RecoverCard(model: model, library: s)
                 if let p = model.allProof, p.total > 0 {
-                    Card(title: "Proof every removed item is in Google Drive", symbol: "checkmark.seal.fill", tint: Theme.good) {
+                    Card(title: "Proof every removed item is in \(Backup.name)", symbol: "checkmark.seal.fill", tint: Theme.good) {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 6) {
                                 Image(systemName: p.allConfirmed ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                                     .foregroundStyle(p.allConfirmed ? Theme.good : Theme.warn)
-                                Text("\(Fmt.count(p.confirmed)) of \(Fmt.count(p.total)) removals had Google Drive's hash re-read and matched at the moment of removal.")
+                                Text("\(Fmt.count(p.confirmed)) of \(Fmt.count(p.total)) removals had \(Backup.name)'s hash re-read and matched at the moment of removal.")
                                     .fontWeight(.semibold)
                             }
-                            Text("\(Fmt.count(p.stillVerified)) are still recorded as verified in Google Drive. Check Google Drive on the Backup tab re-reads every one of them.")
+                            Text("\(Fmt.count(p.stillVerified)) are still recorded as verified in \(Backup.name). Check \(Backup.name) on the Backup tab re-reads every one of them.")
                                 .foregroundStyle(.secondary)
                         }
                         .font(.callout).fixedSize(horizontal: false, vertical: true)
@@ -167,17 +167,17 @@ struct DriveCheckCard: View {
 
     var body: some View {
         let audit = model.latest(.audit)
-        Card(title: "Is everything really in Google Drive?", symbol: "checkmark.seal.fill", tint: Theme.good,
+        Card(title: "Is everything really in \(Backup.name)?", symbol: "checkmark.seal.fill", tint: Theme.good,
              trailing: (audit?.running ?? false) ? nil : AnyView(CapsuleButton(title: audit == nil ? "Check now" : "Check again", symbol: "arrow.clockwise", color: Theme.good, style: .soft) { model.runAudit() })) {
             VStack(alignment: .leading, spacing: 6) {
                 if let a = audit, a.running {
-                    Running(text: "Asking Google Drive for every file's hash (about 7 minutes)…", since: a.task.startedAt)
+                    Running(text: "Asking \(Backup.name) for every file's hash (about 7 minutes)…", since: a.task.startedAt)
                 } else if let r = audit?.decode(AuditReport.self), let a = audit {
                     AuditSummary(report: r, at: a.task.startedAt)
                 } else if let msg = audit?.errorMessage {
                     Text("The check could not finish: \(msg)").font(.callout).foregroundStyle(Theme.bad)
                 } else {
-                    Text("Re-reads the SHA-256 of every file in Google Drive and compares it with the hash taken when it left the phone. Every removal also re-checks its own items in the same run.")
+                    Text("Re-reads the SHA-256 of every file in \(Backup.name) and compares it with the hash taken when it left the phone. Every removal also re-checks its own items in the same run.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }
@@ -310,7 +310,7 @@ struct CoverageRow: View {
                         RowButton(title: "Back up \(Fmt.count(left.count))", symbol: "icloud.and.arrow.up", color: Tab.backup.color, style: .fill) {
                             model.backUpSource(c.channel)
                         }
-                        .help("Copies all \(Fmt.count(left.count)) (\(Fmt.bytes(left.bytes))) to Google Drive and checks each hash. Nothing is removed from the phone.")
+                        .help("Copies all \(Fmt.count(left.count)) (\(Fmt.bytes(left.bytes))) to \(Backup.name) and checks each hash. Nothing is removed from the phone.")
                     }
                 }
                 .font(.caption)
@@ -351,7 +351,7 @@ struct CoverageRow: View {
     private func why(_ c: ChannelStats, _ left: Tally) -> String {
         let age = c.notBackedUpAge.map { ", \($0)" } ?? ""
         if c.verified.count == 0 { return "Never backed up: no backup has been run for this source yet\(age)." }
-        return "\(Fmt.count(left.count)) not in Google Drive yet\(age)."
+        return "\(Fmt.count(left.count)) not in \(Backup.name) yet\(age)."
     }
 }
 
@@ -425,7 +425,7 @@ struct AppBreakdown: View {
             RowButton(title: "Back up", symbol: "icloud.and.arrow.up", color: Tab.backup.color, style: .soft) {
                 model.backUpApp(a)
             }
-            .help("Copies \(a.app)'s \(Fmt.count(a.tally.count)) (\(Fmt.bytes(a.tally.bytes))) to Google Drive and checks each hash. Nothing is removed from the phone.")
+            .help("Copies \(a.app)'s \(Fmt.count(a.tally.count)) (\(Fmt.bytes(a.tally.bytes))) to \(Backup.name) and checks each hash. Nothing is removed from the phone.")
         }
     }
 }

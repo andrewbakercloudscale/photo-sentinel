@@ -138,7 +138,7 @@ struct LayoutCard: View {
         if let linkError {
             Text(linkError).font(.caption).foregroundStyle(Theme.bad)
         }
-        Text("Folders start at the top of your Google Drive. Leave one empty to keep that source with the photos. Videos use the photos' layout.")
+        Text("Folders start at the top of your \(Backup.name). Leave one empty to keep that source with the photos. Videos use the photos' layout.")
             .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
     }
 
@@ -223,7 +223,7 @@ struct LayoutCard: View {
     @ViewBuilder private var refileView: some View {
         if let r = refile, r.toMove > 0 {
             VStack(alignment: .leading, spacing: 6) {
-                Text("\(Fmt.count(r.toMove)) files already in Google Drive are in the old place.")
+                Text("\(Fmt.count(r.toMove)) files already in \(Backup.name) are in the old place.")
                     .font(.callout.weight(.semibold))
                 ForEach(r.examples.prefix(2), id: \.self) { e in
                     Text("\(e.from)\n→ \(e.to)").font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(2)
@@ -232,19 +232,19 @@ struct LayoutCard: View {
                     Text("\(Fmt.count(n)) stay where they are: \(reason).").font(.caption).foregroundStyle(.secondary)
                 }
                 HStack {
-                    CapsuleButton(title: "Move them in Google Drive", symbol: "arrow.right.doc.on.clipboard", color: Tab.backup.color) {
+                    CapsuleButton(title: "Move them in \(Backup.name)", symbol: "arrow.right.doc.on.clipboard", color: Tab.backup.color) {
                         model.refile(Self.refileSources)
                         refile = nil
                     }
                     .disabled(busy)
                     .help(busy ? "Wait for the backup under way to finish" : "Each file is found by its fingerprint at the new place before the ledger changes")
-                    Text("Moves inside Google Drive; nothing is re-uploaded. Progress is in Activity.").font(.caption).foregroundStyle(.secondary)
+                    Text("Moves inside \(Backup.name); nothing is re-uploaded. Progress is in Activity.").font(.caption).foregroundStyle(.secondary)
                 }
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Tab.backup.color.opacity(0.08)))
         } else {
-            Text("Saving changes new backups. If files already in Google Drive are then in the old place, a button here moves them.")
+            Text("Saving changes new backups. If files already in \(Backup.name) are then in the old place, a button here moves them.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
     }

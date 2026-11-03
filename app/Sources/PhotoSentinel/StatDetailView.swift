@@ -84,7 +84,7 @@ struct StatDetailSheet: View {
 
     private var title: String {
         switch stat {
-        case .verified: "Checked safe in Google Drive"
+        case .verified: "Checked safe in \(Backup.name)"
         case .freed: "Freed on the phone"
         case .recentlyDeleted: "In Recently Deleted"
         }
@@ -116,9 +116,9 @@ struct StatDetailSheet: View {
     private var rule: String {
         switch stat {
         case .verified:
-            "Items still on your iPhone whose Google Drive copy was downloaded and matched the original's SHA-256 fingerprint, byte for byte. Only these can ever be removed from the phone."
+            "Items still on your iPhone whose \(Backup.name) copy was downloaded and matched the original's SHA-256 fingerprint, byte for byte. Only these can ever be removed from the phone."
         case .freed:
-            "The size of every item Photo Sentinel removed from your iPhone, added up. Each one was checked in Google Drive first, and the phone was re-checked just before."
+            "The size of every item Photo Sentinel removed from your iPhone, added up. Each one was checked in \(Backup.name) first, and the phone was re-checked just before."
         case .recentlyDeleted:
             "Items Photo Sentinel removed in the last 30 days. iPhone keeps deleted items in Recently Deleted for 30 days, so these can still be put back from the Photos app."
         }
@@ -135,12 +135,12 @@ struct StatDetailSheet: View {
     private func note(_ d: StatDetail) -> String? {
         switch stat {
         case .verified:
-            "Removed items drop out of this number and into Freed on the phone. They stay in Google Drive."
+            "Removed items drop out of this number and into Freed on the phone. They stay in \(Backup.name)."
         case .freed:
             "This counts removals, not space you can see in iPhone Storage yet: items in Recently Deleted still use space until it empties itself after 30 days, or you empty it."
         case .recentlyDeleted:
             (d.firstExpiry.flatMap(Fmt.dateOnly).map { "The first of these leave Recently Deleted for good on \($0). " } ?? "")
-                + "If you emptied Recently Deleted on the phone, they are already gone; Photo Sentinel cannot see that. Every one is still in Google Drive."
+                + "If you emptied Recently Deleted on the phone, they are already gone; Photo Sentinel cannot see that. Every one is still in \(Backup.name)."
         }
     }
 

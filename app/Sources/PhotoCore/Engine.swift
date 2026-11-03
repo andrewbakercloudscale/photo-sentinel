@@ -186,6 +186,9 @@ public struct StorageReport: Codable, Sendable {
     /// "Google Drive (gdrive)".
     public var accountTitle: String { account.map { "\($0.title) (\($0.name))" } ?? remote }
 
+    /// What the app's text calls the backup account: "Google Drive", "S3", "your backup folder".
+    public var backupName: String { Backup.name(kind: account?.kind, title: account?.title) }
+
     /// Where an item goes, the same rule as cloud.py's `destination_for`: channel first,
     /// because a screenshot or a WhatsApp photo is a PHOTO by type.
     public func folder(channel: String, video: Bool) -> String {
@@ -364,5 +367,21 @@ extension CLIEngine {
             throw JobError.message(e)
         }
         return try JSONDecoder().decode(type, from: data)
+    }
+}
+
+/// The name every sentence in the app uses for where backups go, so the text says
+/// "S3" when the backups go to S3. Set from `config storage` whenever the app reads it;
+/// "Google Drive" until then, the default account.
+public enum Backup {
+    nonisolated(unsafe) public static var name = "Google Drive"
+
+    public static func name(kind: String?, title: String?) -> String {
+        switch kind {
+        case nil, "drive": return "Google Drive"
+        case "s3": return "S3"
+        case "local": return "your backup folder"
+        default: return title ?? "Google Drive"
+        }
     }
 }

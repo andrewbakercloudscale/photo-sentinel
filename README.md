@@ -43,7 +43,7 @@ first. Latest release: [v0.6.0](https://github.com/andrewbakercloudscale/photo-s
   Live Photos" button copies each one's moving part to Google Drive beside its
   photo; after that, Live Photos can be cleaned up like any other photo.
 - **A signed download.** For now you build the app yourself (below).
-- **Google Drive only.** Other backup targets, such as Amazon S3, are planned.
+- **Google Drive or S3.** Backups to an S3 bucket work and are checked by MD5, but adding an S3 account still opens Terminal (`rclone config`), and it has not yet been tried against a real bucket.
 
 **How it reads the phone:** through Apple's PhotoKit, against the Mac's Photos
 library, not over USB. An early spike found USB reaches 1.9% of a real

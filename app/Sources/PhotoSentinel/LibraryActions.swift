@@ -49,11 +49,11 @@ struct CoverageCard: View {
     let library: LibrarySnapshot
 
     var body: some View {
-        Card(title: "Safe in Google Drive", symbol: "checkmark.shield.fill", tint: Theme.good) {
+        Card(title: "Safe in \(Backup.name)", symbol: "checkmark.shield.fill", tint: Theme.good) {
             VStack(spacing: 10) {
                 ForEach(library.channels) { c in
                     ActionRow(label: c.channel.title, value: c.coverage, text: Fmt.pct(c.coverage), color: Theme.good,
-                              note: c.coverage >= 0.999 ? "all \(Fmt.count(c.total.count)) in Google Drive"
+                              note: c.coverage >= 0.999 ? "all \(Fmt.count(c.total.count)) in \(Backup.name)"
                                   : "\(Fmt.bytes(c.total.bytes - c.verified.bytes)) only on the phone"
                                     + (c.notBackedUpAge.map { ", \($0)" } ?? "")) {
                         if let source = c.channel.cliSource {
@@ -96,7 +96,7 @@ struct BiggestVideosCard: View {
                         Text(String(v.created.prefix(7))).foregroundStyle(.secondary)
                         Spacer()
                         Text(Fmt.bytes(v.bytes)).fontWeight(.semibold).monospacedDigit()
-                        Text(v.inDrive ? "in Google Drive" : "phone only").foregroundStyle(v.inDrive ? Theme.good : Theme.warn).frame(width: 78, alignment: .trailing)
+                        Text(v.inDrive ? "in \(Backup.name)" : "phone only").foregroundStyle(v.inDrive ? Theme.good : Theme.warn).frame(width: 78, alignment: .trailing)
                         if v.inDrive {
                             RowButton(title: "Delete from iPhone…", symbol: "iphone.and.arrow.forward", style: .fill) { remove([v]) }
                         } else {
@@ -119,7 +119,7 @@ struct BiggestVideosCard: View {
                         RowButton(title: "Delete picked from iPhone…", symbol: "iphone.and.arrow.forward", style: .fill) { remove(chosen) }
                     }
                 }
-                Text("Back up copies a video off the phone, uploads it and checks it in Google Drive. Remove only ever takes what Google Drive has checked.")
+                Text("Back up copies a video off the phone, uploads it and checks it in \(Backup.name). Remove only ever takes what \(Backup.name) has checked.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -159,7 +159,7 @@ struct PlacesCard: View {
                     ForEach(library.places.prefix(12)) { p in
                         ActionRow(label: p.country, value: Double(p.total.bytes) / max(top, 1), text: Fmt.bytes(p.total.bytes),
                                   color: Tab.library.color,
-                                  note: "\(Fmt.count(p.total.count)) items · \(Fmt.pct(p.coverage)) in Google Drive") {
+                                  note: "\(Fmt.count(p.total.count)) items · \(Fmt.pct(p.coverage)) in \(Backup.name)") {
                             if p.cities.count > 1 {
                                 RowButton(title: open.contains(p.id) ? "Hide cities" : "\(p.cities.count) cities",
                                           symbol: open.contains(p.id) ? "chevron.up" : "chevron.down", color: Tab.library.color, style: .ghost) {
@@ -173,7 +173,7 @@ struct PlacesCard: View {
                             ForEach(p.cities.prefix(15)) { c in
                                 ActionRow(label: "    " + c.city, value: Double(c.total.bytes) / max(top, 1), text: Fmt.bytes(c.total.bytes),
                                           color: Tab.library.color.opacity(0.55),
-                                          note: "    \(Fmt.count(c.total.count)) items · \(Fmt.pct(c.coverage)) in Google Drive") {
+                                          note: "    \(Fmt.count(c.total.count)) items · \(Fmt.pct(c.coverage)) in \(Backup.name)") {
                                     RowButton(title: "Filter", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country, city: c.city) }
                                         .help("Pick everything taken in \(c.city) in Set your backup rules. Nothing is removed from here.")
                                 }

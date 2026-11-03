@@ -74,9 +74,9 @@ extension Ledger {
             \(base)
             """, args)[0]
         b.byStatus = [
-            .init(key: "canGo", title: "In Google Drive, can go", tally: tally(s, 0)),
-            .init(key: "kept", title: "In Google Drive, kept for safety", tally: tally(s, 2)),
-            .init(key: "notInDrive", title: "Not in Google Drive yet", tally: tally(s, 4)),
+            .init(key: "canGo", title: "In \(Backup.name), can go", tally: tally(s, 0)),
+            .init(key: "kept", title: "In \(Backup.name), kept for safety", tally: tally(s, 2)),
+            .init(key: "notInDrive", title: "Not in \(Backup.name) yet", tally: tally(s, 4)),
         ].filter { $0.tally.count > 0 }
 
         func periods(_ expr: String) throws -> [Breakdown.Period] {

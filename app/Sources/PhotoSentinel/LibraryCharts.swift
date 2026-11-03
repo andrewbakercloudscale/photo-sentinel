@@ -113,7 +113,7 @@ enum TimeUnit: String, CaseIterable { case year, month }
 /// What the bars over time are split by.
 enum TimeSplit: String, CaseIterable {
     case source, kind, drive
-    var title: String { switch self { case .source: "What's using it"; case .kind: "Photo or video"; case .drive: "Google Drive" } }
+    var title: String { switch self { case .source: "What's using it"; case .kind: "Photo or video"; case .drive: "\(Backup.name)" } }
 }
 
 enum TimeSpan: String, CaseIterable {
@@ -152,7 +152,7 @@ struct Donuts: View {
                 Theme.color(Channel(rawValue: $0) ?? .unattributed)
             }, onPick: onSource.map { f in { key in Channel(rawValue: key).map(f) } })
             Donut(title: "Kind", slices: b.byKind, total: b.total, color: Self.kindColor, onPick: nil)
-            Donut(title: "Google Drive", slices: b.byStatus, total: b.total, color: Self.statusColor, onPick: nil)
+            Donut(title: "\(Backup.name)", slices: b.byStatus, total: b.total, color: Self.statusColor, onPick: nil)
         }
     }
 
@@ -250,7 +250,7 @@ private struct Timeline: View {
     private var series: [(key: String, title: String, color: Color)] {
         switch split {
         case .drive:
-            return [("in", "In Google Drive", Theme.good), ("out", "Not in Google Drive yet", Theme.warn)]
+            return [("in", "In \(Backup.name)", Theme.good), ("out", "Not in \(Backup.name) yet", Theme.warn)]
         case .source:
             // Other apps is mostly a few apps (AirDrop, Snapchat): give each its own colour.
             let apps = apps

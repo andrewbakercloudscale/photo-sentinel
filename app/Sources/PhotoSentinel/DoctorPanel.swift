@@ -15,9 +15,9 @@ struct DoctorPanel: View {
         var problem: String?
     }
 
-    static let groups = ["Getting your photos onto this Mac", "This Mac", "Google Drive", "Records"]
+    static var groups: [String] { ["Getting your photos onto this Mac", "This Mac", Backup.name, "Records"] }
 
-    static let info: [String: Info] = [
+    static var info: [String: Info] { [
         "apple_account": Info(group: 0, doing: "Checking your Apple account", ok: "Signed in to your Apple account"),
         "library": Info(group: 0, doing: "Finding your Photos library", ok: "Photos library found"),
         "icloud_mode": Info(group: 0, doing: "Checking how iCloud Photos stores files", ok: "iCloud Photos is set up"),
@@ -31,11 +31,11 @@ struct DoctorPanel: View {
         "tools": Info(group: 1, doing: "Finding the tools it needs", ok: "Tools installed", problem: "A tool it needs is missing"),
         "platform": Info(group: 1, doing: "Checking macOS", ok: "macOS supported"),
         "logging": Info(group: 1, doing: "Checking the log folder", ok: "Logs are being kept"),
-        "cloud": Info(group: 2, doing: "Checking Google Drive is connected", ok: "Google Drive connected",
-                      problem: "Google Drive isn't connected"),
+        "cloud": Info(group: 2, doing: "Checking \(Backup.name) is connected", ok: "\(Backup.name) connected",
+                      problem: "\(Backup.name) isn't connected"),
         "ledger_conflicts": Info(group: 3, doing: "Checking the records for contradictions", ok: "Records are consistent",
                                  problem: "The records contradict themselves"),
-    ]
+    ] }
 
     static func info(_ key: String) -> Info { info[key] ?? Info(group: 3, doing: "Checking \(key)", ok: key) }
 

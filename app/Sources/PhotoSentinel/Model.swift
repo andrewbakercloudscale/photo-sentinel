@@ -13,7 +13,8 @@ final class Model: ObservableObject {
     @Published var everything: Breakdown?
     @Published var selection: Breakdown?
     /// The backup account, its folders and the archive folder, from `config storage`.
-    @Published var storage: StorageReport?
+    /// Sets `Backup.name` too, so every sentence names the account backups really go to.
+    @Published var storage: StorageReport? { didSet { Backup.name = storage?.backupName ?? "Google Drive" } }
     /// Google Photos, the extra copy for viewing: `google-photos status`.
     @Published var googlePhotos: GooglePhotosStatus?
     @Published var jobs: [Job] = []
@@ -207,7 +208,7 @@ final class Model: ObservableObject {
     var runningTask: TaskStatus? { tasks.first(where: \.running) }
 
     func runAudit() {
-        launch(.audit, recipe: nil, title: "Google Drive check", args: ["audit"])
+        launch(.audit, recipe: nil, title: "\(Backup.name) check", args: ["audit"])
     }
 
     /// Reads where each item was taken from Photos into the ledger. About 10 seconds;
@@ -232,13 +233,13 @@ final class Model: ObservableObject {
 
     /// Downloads removed items back from Drive into a new folder in Downloads, hash-checked.
     func recover(_ ids: [Int]) {
-        launch(.recover, recipe: nil, title: "Recover \(ids.count) item\(ids.count == 1 ? "" : "s") from Google Drive",
+        launch(.recover, recipe: nil, title: "Recover \(ids.count) item\(ids.count == 1 ? "" : "s") from \(Backup.name)",
                args: ["recover"] + ids.flatMap { ["--id", String($0)] })
     }
 
     /// Moves files already in Drive to where the saved layout puts them (`refile`).
     func refile(_ sources: [String]) {
-        launch(.refile, recipe: nil, title: "Move existing files in Google Drive",
+        launch(.refile, recipe: nil, title: "Move existing files in \(Backup.name)",
                args: ["refile", "--apply"] + sources.flatMap { ["--source", $0] })
     }
 
@@ -332,7 +333,7 @@ final class Model: ObservableObject {
         plan = steps.filter { $0.removableNow.count > 0 }.map(\.recipe)
         planDone = []
         if plan.isEmpty {
-            notice = "Backups queued. Nothing is in Google Drive yet to remove; come back when they finish."
+            notice = "Backups queued. Nothing is in \(Backup.name) yet to remove; come back when they finish."
         } else {
             planNext()
         }
@@ -372,11 +373,11 @@ final class Model: ObservableObject {
         guard let source = c.cliSource else {
             let ids = (try? Ledger.notBackedUpIds(SQLiteReader(path: ledgerPath), channel: c)) ?? []
             let bytes = library?.channels.first { $0.channel == c }.map { $0.total.bytes - $0.verified.bytes } ?? 0
-            if !ids.isEmpty { backUpItems(ids, bytes: bytes, label: "\(c.title): everything not in Google Drive") }
+            if !ids.isEmpty { backUpItems(ids, bytes: bytes, label: "\(c.title): everything not in \(Backup.name)") }
             return
         }
         let wanted = ["photo", "video"].map {
-            QueuedBackup(type: $0, source: source, older: "0d", label: "\(c.title) \($0 == "video" ? "videos" : "photos"): everything not in Google Drive")
+            QueuedBackup(type: $0, source: source, older: "0d", label: "\(c.title) \($0 == "video" ? "videos" : "photos"): everything not in \(Backup.name)")
         }
         queue += wanted.filter { !queue.contains($0) }
         pumpQueue()
@@ -542,7 +543,7 @@ final class Model: ObservableObject {
     func emptyBin() {
         let alert = NSAlert()
         alert.messageText = "Empty the Bin" + (binBytes.map { " (\(Fmt.bytes($0)))" } ?? "") + "?"
-        alert.informativeText = "This permanently deletes everything in the Bin, including anything else you deleted. Photo Sentinel's tidied copies there are already safe in Google Drive."
+        alert.informativeText = "This permanently deletes everything in the Bin, including anything else you deleted. Photo Sentinel's tidied copies there are already safe in \(Backup.name)."
         alert.addButton(withTitle: "Empty Bin")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }

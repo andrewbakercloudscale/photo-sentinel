@@ -405,6 +405,30 @@ final class JobsTests: XCTestCase {
         XCTAssertEqual(j.step, "uploading to Google Drive, \(Fmt.count(1585)) of \(Fmt.count(11602)) files")
     }
 
+    /// The text names the account backups really go to: "S3" when they go to S3.
+    func testTextNamesTheBackupAccount() throws {
+        func report(_ kind: String, _ title: String) throws -> StorageReport {
+            let json = """
+            {"remote":"r","account":{"name":"r","kind":"\(kind)","title":"\(title)","canVerify":true},
+             "accounts":[],"archive":"/a","destinations":{},
+             "backedUp":{"count":0,"bytes":0},"proposed":{"remote":"r","archive":"/a"},"changed":false,"applied":false}
+            """
+            return try JSONDecoder().decode(StorageReport.self, from: Data(json.utf8))
+        }
+        XCTAssertEqual(try report("drive", "Google Drive").backupName, "Google Drive")
+        XCTAssertEqual(try report("s3", "S3 compatible").backupName, "S3")
+        XCTAssertEqual(try report("local", "A folder on this Mac").backupName, "your backup folder")
+        XCTAssertEqual(Backup.name(kind: nil, title: nil), "Google Drive", "no account yet: the default one")
+
+        let saved = Backup.name
+        defer { Backup.name = saved }
+        Backup.name = try report("s3", "S3 compatible").backupName
+        let more = log + "\n[10-26 06:28:00] [whatsapp/photo] uploading what landed"
+            + "\n  2026/10/26 09:57:22 NOTICE:   450.249 MiB / 1.993 GiB, 22%, 47.892 KiB/s, ETA 9h26m50s (xfr#1585/11602)"
+        let j = Jobs.read(log: more, processes: ["/bin/bash /x/cycle.sh photo 40 whatsapp 18m"])[0]
+        XCTAssertEqual(j.step, "uploading to S3, \(Fmt.count(1585)) of \(Fmt.count(11602)) files")
+    }
+
     func testARunSaysWhatItDid() {
         let run = """
             [10-27 11:27:19] [screenshot/photo] starting: 40 cycle(s), 137 left to fetch, 61.8 GB free

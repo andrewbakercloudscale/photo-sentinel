@@ -1,4 +1,5 @@
 import AppKit
+import PhotoCore
 import Photos
 import SwiftUI
 import UserNotifications
@@ -41,7 +42,7 @@ final class Permissions: ObservableObject {
         }
         let list = [
             Item(id: "photos", title: "Photos",
-                 why: "Read your library to back it up, and remove what Google Drive has checked. Needs full access: with only some photos allowed, the rest are never seen.",
+                 why: "Read your library to back it up, and remove what \(Backup.name) has checked. Needs full access: with only some photos allowed, the rest are never seen.",
                  symbol: "photo.on.rectangle.angled", state: photos),
             Item(id: "fda", title: "Full Disk Access",
                  why: "Read the Photos library's places and the ledger and archive on your Desktop, without macOS asking folder by folder.",

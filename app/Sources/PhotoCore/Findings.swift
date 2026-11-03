@@ -31,16 +31,16 @@ public enum Detector {
     /// Tidied Mac copies go to the Bin, so emptying it is usually what gives the space back.
     static func lowMacSpace(_ c: Check, jobs: [Job], binBytes: Int64?) -> Finding {
         let free = c.detail.components(separatedBy: " free").first ?? c.detail
-        var detail = "Backups copy each item to this Mac on its way to Google Drive, in batches that shrink to fit, and always leave some space free. There is no room for even a small batch now."
+        var detail = "Backups copy each item to this Mac on its way to \(Backup.name), in batches that shrink to fit, and always leave some space free. There is no room for even a small batch now."
         let running = jobs.filter { $0.state == .running }.map(\.title)
         if !running.isEmpty {
             detail += " The running \(running.joined(separator: " and ")) backup tidies its Mac copies when it ends."
         }
         let binWorthIt = binBytes.map { $0 >= 100_000_000 } ?? true
         if let b = binBytes, binWorthIt {
-            detail += " The Bin holds \(Fmt.bytes(b)): tidied copies go there, already safe in Google Drive, and the space only comes back when it is emptied."
+            detail += " The Bin holds \(Fmt.bytes(b)): tidied copies go there, already safe in \(Backup.name), and the space only comes back when it is emptied."
         } else if binBytes == nil {
-            detail += " Tidied copies go to the Bin, already safe in Google Drive; the space only comes back when it is emptied."
+            detail += " Tidied copies go to the Bin, already safe in \(Backup.name); the space only comes back when it is emptied."
         } else {
             detail += " The Bin is already empty, so see what else is using this Mac's disk."
         }
@@ -61,7 +61,7 @@ public enum Detector {
         if live.count > 0 {
             out.append(Finding(id: "live.motion", kind: .space, symbol: "livephoto",
                                title: "\(Fmt.count(live.count)) Live Photos can't come off the phone yet",
-                               detail: "Google Drive has the photo (\(Fmt.bytes(live.bytes))) but not the few seconds of video that make it move, so they stay on the phone. Back up the moving part and they can be cleaned up like any other photo. Nothing is removed." + (livePhotosRunning ? " Backing up now." : ""),
+                               detail: "\(Backup.name) has the photo (\(Fmt.bytes(live.bytes))) but not the few seconds of video that make it move, so they stay on the phone. Back up the moving part and they can be cleaned up like any other photo. Nothing is removed." + (livePhotosRunning ? " Backing up now." : ""),
                                actionTitle: livePhotosRunning ? "Watch progress" : "Back up Live Photos",
                                action: livePhotosRunning ? .openTab("Activity") : .backUpLivePhotos, bytes: live.bytes))
         }
@@ -92,7 +92,7 @@ public enum Detector {
             let running = jobs.contains { $0.source == "camera" && $0.state == .running }
             out.append(Finding(id: "camera.unprotected", kind: .safety, symbol: "exclamationmark.shield.fill",
                                title: "\(Fmt.count(phoneOnly.count)) camera photos and videos are only on your phone",
-                               detail: "\(Fmt.bytes(phoneOnly.bytes)) with no copy in Google Drive" + (taken.map { ", \($0)." } ?? ".") + (running ? " Backing up now." : ""),
+                               detail: "\(Fmt.bytes(phoneOnly.bytes)) with no copy in \(Backup.name)" + (taken.map { ", \($0)." } ?? ".") + (running ? " Backing up now." : ""),
                                actionTitle: running ? "Watch progress" : "Back up", action: .openTab("Activity"), bytes: phoneOnly.bytes))
         }
 
@@ -121,13 +121,13 @@ public enum Detector {
         for r in s.recipes where r.recipe.kind != .largeVideos {
             if r.removableNow.count > 0 {
                 out.append(Finding(id: "ready.\(r.id)", kind: .space, symbol: r.recipe.symbol,
-                                   title: "About \(Fmt.count(r.removableNow.count)) \(noun(r.recipe)) are safe in Google Drive",
+                                   title: "About \(Fmt.count(r.removableNow.count)) \(noun(r.recipe)) are safe in \(Backup.name)",
                                    detail: "\(Fmt.bytes(r.removableNow.bytes)) you can take off the phone now.",
                                    actionTitle: "Remove from iPhone", action: .recipe(r.id), bytes: r.removableNow.bytes))
             } else if r.notBackedUp.count > 0 {
                 out.append(Finding(id: "todo.\(r.id)", kind: .space, symbol: r.recipe.symbol,
                                    title: "\(Fmt.count(r.selected.count)) \(noun(r.recipe))",
-                                   detail: "\(Fmt.bytes(r.selected.bytes)). Each gets a copy in Google Drive first; you see them before anything goes.",
+                                   detail: "\(Fmt.bytes(r.selected.bytes)). Each gets a copy in \(Backup.name) first; you see them before anything goes.",
                                    actionTitle: "Clean up", action: .recipe(r.id), bytes: r.selected.bytes))
             }
         }

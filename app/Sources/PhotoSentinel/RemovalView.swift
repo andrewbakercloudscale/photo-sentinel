@@ -103,10 +103,10 @@ struct RemovalSheet: View {
         let missing = stats?.notBackedUp ?? Tally()
         Step(number: 1, title: "Back up", done: missing.count == 0) {
             if missing.count == 0 {
-                Text("Everything this clean-up selects is already in Google Drive.").font(.callout)
+                Text("Everything this clean-up selects is already in \(Backup.name).").font(.callout)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("\(Fmt.count(missing.count)) items (\(Fmt.bytes(missing.bytes))) are only on the phone. They are never removed until Google Drive has them. You can still remove the rest now.")
+                    Text("\(Fmt.count(missing.count)) items (\(Fmt.bytes(missing.bytes))) are only on the phone. They are never removed until \(Backup.name) has them. You can still remove the rest now.")
                         .font(.callout).fixedSize(horizontal: false, vertical: true)
                     if recipe.backups.isEmpty {
                         Text("Back these up with the Camera videos and Screen recordings clean-ups.").font(.callout).foregroundStyle(.secondary)
@@ -127,12 +127,12 @@ struct RemovalSheet: View {
                                 if let ahead = model.runningBackup {
                                     Pill(text: "Waiting for the \(ahead.title) backup to end", symbol: "clock.fill", color: Theme.warn)
                                     CapsuleButton(title: "Back these up first", symbol: "arrow.up.to.line", color: Tab.backup.color) { model.backUpFirst(recipe) }
-                                        .help("Stops the \(ahead.title) backup, backs these up, then carries on with \(ahead.title) from where it was. Nothing is lost: what is already in Google Drive stays there.")
+                                        .help("Stops the \(ahead.title) backup, backs these up, then carries on with \(ahead.title) from where it was. Nothing is lost: what is already in \(Backup.name) stays there.")
                                 } else {
                                     Pill(text: "Queued · starting", symbol: "clock.fill", color: Theme.warn)
                                 }
                             } else {
-                                CapsuleButton(title: "Back up to Google Drive", symbol: "icloud.and.arrow.up.fill", color: Tab.backup.color) { model.backUp(recipe) }
+                                CapsuleButton(title: "Back up to \(Backup.name)", symbol: "icloud.and.arrow.up.fill", color: Tab.backup.color) { model.backUp(recipe) }
                             }
                         }
                         if running, let step = model.jobs.first(where: { j in j.state == .running && recipe.backups.contains { $0.source == j.source } })?.step {
@@ -147,12 +147,12 @@ struct RemovalSheet: View {
     // MARK: 2. Confirm Google Drive holds everything it is said to hold
 
     @ViewBuilder private var driveStep: some View {
-        Step(number: 2, title: "Check all of Google Drive (optional)", done: driveConfirmed) {
+        Step(number: 2, title: "Check all of \(Backup.name) (optional)", done: driveConfirmed) {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Re-reads the SHA-256 of every file in Google Drive and compares it with the hash taken when it was copied off the phone. Takes about 7 minutes. You can skip it: the removal re-checks each item it removes in Google Drive anyway.")
+                Text("Re-reads the SHA-256 of every file in \(Backup.name) and compares it with the hash taken when it was copied off the phone. Takes about 7 minutes. You can skip it: the removal re-checks each item it removes in \(Backup.name) anyway.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let a = audit, a.running {
-                    Running(text: "Asking Google Drive for every file's hash (about 7 minutes)…", since: a.task.startedAt)
+                    Running(text: "Asking \(Backup.name) for every file's hash (about 7 minutes)…", since: a.task.startedAt)
                 } else if let r = auditReport, auditFresh {
                     AuditSummary(report: r, at: audit!.task.startedAt)
                     if !r.clean { Text("Removal stays locked until this is clean.").font(.callout.weight(.semibold)).foregroundStyle(Theme.bad) }
@@ -164,7 +164,7 @@ struct RemovalSheet: View {
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 if !(audit?.running ?? false) && !driveConfirmed || (auditReport != nil && !auditFresh) {
-                    CapsuleButton(title: audit == nil ? "Check Google Drive" : "Check again", symbol: "checkmark.shield.fill", color: Theme.good, style: .soft) { model.runAudit() }
+                    CapsuleButton(title: audit == nil ? "Check \(Backup.name)" : "Check again", symbol: "checkmark.shield.fill", color: Theme.good, style: .soft) { model.runAudit() }
                 }
             }
         }
@@ -178,10 +178,10 @@ struct RemovalSheet: View {
         Step(number: 3, title: "Remove from iPhone", done: done, locked: driveBlocks && removal == nil) {
             VStack(alignment: .leading, spacing: 10) {
                 if let r = removal, r.running {
-                    Text("Removing \(recipe.title.lowercased()) that are safe in Google Drive, and nothing else.")
+                    Text("Removing \(recipe.title.lowercased()) that are safe in \(Backup.name), and nothing else.")
                         .font(.body.weight(.semibold))
                     Running(text: (r.progressText ?? "Getting ready") + "…", since: r.task.startedAt)
-                    Text("It checks each one is still on the phone and re-checks its copy in Google Drive. Everything else is only read, never changed. Then macOS asks to allow deleting them, with the exact count: click Delete in that box.")
+                    Text("It checks each one is still on the phone and re-checks its copy in \(Backup.name). Everything else is only read, never changed. Then macOS asks to allow deleting them, with the exact count: click Delete in that box.")
                         .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 } else if done, let r = removal?.decode(RemovalPlan.self) {
                     Text("Removed \(Fmt.count(r.removed ?? 0)) items, \(Fmt.bytes(r.bytesRemoved ?? 0)).")
@@ -190,7 +190,7 @@ struct RemovalSheet: View {
                         .font(.callout).foregroundStyle(.secondary)
                     if r.blocked > 0 { PlanSummary(plan: r, kept: true) }
                 } else if driveBlocks {
-                    Text((audit?.running ?? false) ? "Unlocks when the Google Drive check in step 2 finishes." : "Locked: the Google Drive check in step 2 found problems. Fix them and check again.")
+                    Text((audit?.running ?? false) ? "Unlocks when the \(Backup.name) check in step 2 finishes." : "Locked: the \(Backup.name) check in step 2 found problems. Fix them and check again.")
                         .font(.callout).foregroundStyle(.secondary)
                 } else {
                     if usedUp, let last = lastRemoval?.decode(RemovalPlan.self) {
@@ -200,11 +200,11 @@ struct RemovalSheet: View {
                     let missing = stats?.notBackedUp.count ?? 0
                     if estimate == 0 && missing > 0 {
                         // Running it now would only check them all to say this.
-                        Callout(text: "Nothing can come off yet: none of the \(Fmt.count(missing)) are in Google Drive. Back them up in step 1 above. Remove opens here when that finishes.")
+                        Callout(text: "Nothing can come off yet: none of the \(Fmt.count(missing)) are in \(Backup.name). Back them up in step 1 above. Remove opens here when that finishes.")
                     } else {
                         if let msg = removal?.errorMessage, !usedUp {
                             Callout(text: msg.contains("nothing is safe to remove")
-                                    ? "Nothing was removed: none of them are safely in Google Drive yet. Back them up in step 1 above."
+                                    ? "Nothing was removed: none of them are safely in \(Backup.name) yet. Back them up in step 1 above."
                                     : "The last try stopped: \(msg)")
                         }
                         removeForm(estimate: estimate)
@@ -215,7 +215,7 @@ struct RemovalSheet: View {
     }
 
     @ViewBuilder private func removeForm(estimate: Int) -> some View {
-        Text("Removes \(estimate > 0 ? "about \(Fmt.count(estimate)) " : "")\(recipe.title.lowercased()) whose copy in Google Drive is checked again first. Anything not safely there stays on the phone. Removed items go to Recently Deleted for 30 days, on this iPhone and every device on the same iCloud account.")
+        Text("Removes \(estimate > 0 ? "about \(Fmt.count(estimate)) " : "")\(recipe.title.lowercased()) whose copy in \(Backup.name) is checked again first. Anything not safely there stays on the phone. Removed items go to Recently Deleted for 30 days, on this iPhone and every device on the same iCloud account.")
             .font(.callout).fixedSize(horizontal: false, vertical: true)
         Text("Type Confirm to start:").font(.callout)
         HStack {
@@ -240,7 +240,7 @@ struct RemovalSheet: View {
 
     @ViewBuilder private var proofStep: some View {
         if let p = proof, p.total > 0 {
-            Step(number: 4, title: "Proof they are in Google Drive", done: p.allConfirmed) {
+            Step(number: 4, title: "Proof they are in \(Backup.name)", done: p.allConfirmed) {
                 ProofTable(proof: p)
             }
         }
@@ -272,7 +272,7 @@ struct WhereTheyGo: View {
             HStack(spacing: 8) {
                 Image(systemName: "externaldrive.fill.badge.icloud").foregroundStyle(Tab.backup.color)
                 Text("Where they go").font(.headline)
-                Text(model.storage?.accountTitle ?? "Google Drive").foregroundStyle(.secondary)
+                Text(model.storage?.accountTitle ?? Backup.name).foregroundStyle(.secondary)
                 Spacer()
                 CapsuleButton(title: "Change folders", symbol: "folder.badge.gearshape", color: Tab.backup.color, style: .soft) {
                     model.removing = nil
@@ -304,7 +304,7 @@ struct WhereTheyGo: View {
             if let linkError {
                 Text(linkError).font(.caption).foregroundStyle(Theme.bad)
             }
-            Text("Removed items go to Recently Deleted on the phone for 30 days. Nothing is deleted from Google Drive.")
+            Text("Removed items go to Recently Deleted on the phone for 30 days. Nothing is deleted from \(Backup.name).")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(14)
@@ -387,13 +387,13 @@ struct AuditSummary: View {
                 Image(systemName: report.clean ? "checkmark.seal.fill" : "xmark.octagon.fill")
                     .foregroundStyle(report.clean ? Theme.good : Theme.bad)
                 Text(report.clean
-                     ? "\(Fmt.count(report.matched ?? 0)) of \(Fmt.count(report.claimedVerified ?? 0)) backed-up items are in Google Drive with matching hashes."
-                     : "Google Drive does not hold everything the ledger says it does.")
+                     ? "\(Fmt.count(report.matched ?? 0)) of \(Fmt.count(report.claimedVerified ?? 0)) backed-up items are in \(Backup.name) with matching hashes."
+                     : "\(Backup.name) does not hold everything the ledger says it does.")
                     .font(.callout.weight(.semibold))
             }
-            Text("Checked \(at.formatted(date: .omitted, time: .shortened)) · \(Fmt.count(report.remoteFiles ?? 0)) files in Google Drive")
+            Text("Checked \(at.formatted(date: .omitted, time: .shortened)) · \(Fmt.count(report.remoteFiles ?? 0)) files in \(Backup.name)")
                 .font(.caption).foregroundStyle(.secondary)
-            ForEach((report.missing ?? []).prefix(5), id: \.id) { Text("Missing from Google Drive: \($0.path)").font(.caption).foregroundStyle(Theme.bad) }
+            ForEach((report.missing ?? []).prefix(5), id: \.id) { Text("Missing from \(Backup.name): \($0.path)").font(.caption).foregroundStyle(Theme.bad) }
             ForEach((report.hashMismatch ?? []).prefix(5), id: \.id) { Text("Hash differs: \($0.path)").font(.caption).foregroundStyle(Theme.bad) }
             ForEach(report.conflicts.prefix(5), id: \.self) { Text("\($0.kind): \($0.detail)").font(.caption).foregroundStyle(Theme.bad) }
         }
@@ -411,7 +411,7 @@ struct PlanSummary: View {
                 Image(systemName: plan.eligible > 0 ? "checkmark.shield.fill" : "info.circle.fill")
                     .foregroundStyle(plan.eligible > 0 ? Theme.good : Color.secondary)
                 Text(plan.eligible > 0
-                     ? "\(Fmt.count(plan.eligible)) items, \(Fmt.bytes(plan.eligibleBytes)), can go. Each one's Google Drive copy was re-read just now and matched."
+                     ? "\(Fmt.count(plan.eligible)) items, \(Fmt.bytes(plan.eligibleBytes)), can go. Each one's \(Backup.name) copy was re-read just now and matched."
                      : "Nothing can go yet. Everything this clean-up found stays on the phone, for the reasons below.")
                     .font(.callout.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             } }
@@ -433,11 +433,11 @@ struct PlanSummary: View {
     static func plain(_ r: String) -> String {
         switch r {
         case "flagged as a suspected proxy": "Might be a low-res stand-in for the real photo"
-        case "Google Drive's copy is not the size of the original": "Google Drive's copy is smaller than the original, so it may be a low-res stand-in"
-        case "no hash recorded, so the remote copy cannot be compared": "No fingerprint taken, so Google Drive's copy can't be checked"
-        case "not verified in the cloud": "Not in Google Drive yet"
-        case "not at the remote right now": "Missing from Google Drive right now"
-        case "the remote copy does not match the recorded hash": "Google Drive's copy doesn't match"
+        case "Google Drive's copy is not the size of the original": "\(Backup.name)'s copy is smaller than the original, so it may be a low-res stand-in"
+        case "no hash recorded, so the remote copy cannot be compared": "No fingerprint taken, so \(Backup.name)'s copy can't be checked"
+        case "not verified in the cloud": "Not in \(Backup.name) yet"
+        case "not at the remote right now": "Missing from \(Backup.name) right now"
+        case "the remote copy does not match the recorded hash": "\(Backup.name)'s copy doesn't match"
         case "favourited": "Favourite"
         default: r.prefix(1).uppercased() + r.dropFirst()
         }
@@ -452,14 +452,14 @@ struct ProofTable: View {
             HStack(spacing: 6) {
                 Image(systemName: proof.allConfirmed ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                     .foregroundStyle(proof.allConfirmed ? Theme.good : Theme.warn)
-                Text("\(Fmt.count(proof.confirmed)) of \(Fmt.count(proof.total)) removed items had their Google Drive hash re-read and matched in the same run. \(Fmt.count(proof.stillVerified)) are still verified in Google Drive now.")
+                Text("\(Fmt.count(proof.confirmed)) of \(Fmt.count(proof.total)) removed items had their \(Backup.name) hash re-read and matched in the same run. \(Fmt.count(proof.stillVerified)) are still verified in \(Backup.name) now.")
                     .font(.callout.weight(.semibold)).fixedSize(horizontal: false, vertical: true)
             }
             if !proof.rows.isEmpty {
                 ScrollView {
                     Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 3) {
                         GridRow {
-                            Text("File"); Text("In Google Drive at"); Text("SHA-256"); Text("")
+                            Text("File"); Text("In \(Backup.name) at"); Text("SHA-256"); Text("")
                         }
                         .font(.caption.weight(.bold))
                         ForEach(proof.rows) { r in

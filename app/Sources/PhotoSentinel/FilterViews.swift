@@ -85,8 +85,8 @@ struct FilterBuilder: View {
                 Text(model.draft.summary).font(.body.weight(.semibold))
                 HStack(spacing: 18) {
                     figure("On the phone", s.selected, .primary)
-                    figure("In Google Drive, can go (est.)", s.removableNow, Theme.good)
-                    figure("Not in Google Drive yet", s.notBackedUp, Theme.warn)
+                    figure("In \(Backup.name), can go (est.)", s.removableNow, Theme.good)
+                    figure("Not in \(Backup.name) yet", s.notBackedUp, Theme.warn)
                     figure("Kept for safety", s.kept, .secondary)
                     if counting { ProgressView().controlSize(.small) }
                 }

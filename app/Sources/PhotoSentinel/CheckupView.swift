@@ -11,7 +11,7 @@ struct CheckupView: View {
             Card(title: "What to do next", symbol: "stethoscope", tint: Tab.checkup.color) {
                 VStack(alignment: .leading, spacing: 10) {
                     if findings.isEmpty {
-                        Label("Nothing needs you. Everything selected is safe in Google Drive.", systemImage: "checkmark.seal.fill")
+                        Label("Nothing needs you. Everything selected is safe in \(Backup.name).", systemImage: "checkmark.seal.fill")
                             .foregroundStyle(Theme.good)
                     }
                     ForEach(groups(findings), id: \.0) { label, items in
@@ -35,7 +35,7 @@ struct CheckupView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(findings.isEmpty ? "All clear" : "\(findings.count) thing\(findings.count == 1 ? "" : "s") to look at")
                     .font(.title.weight(.bold))
-                Text("Clean-ups could free \(Fmt.bytes(free)); \(Fmt.bytes(ready)) of it is already safe in Google Drive and can come off the phone now. Read \(model.library.map { $0.readAt.formatted(date: .omitted, time: .shortened) } ?? "–").")
+                Text("Clean-ups could free \(Fmt.bytes(free)); \(Fmt.bytes(ready)) of it is already safe in \(Backup.name) and can come off the phone now. Read \(model.library.map { $0.readAt.formatted(date: .omitted, time: .shortened) } ?? "–").")
                     .font(.body).fixedSize(horizontal: false, vertical: true)
             }
             Spacer()
@@ -64,7 +64,7 @@ struct CheckupView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("\(Fmt.count(s.favourites)) favourites are never cleaned up.")
                 // A Live Photo goes only once both halves are in Google Drive: the Live Photos backup copies the moving part.
-                Text("\(Fmt.count(s.live)) Live Photos are cleaned up only once both the photo and its moving part are in Google Drive.")
+                Text("\(Fmt.count(s.live)) Live Photos are cleaned up only once both the photo and its moving part are in \(Backup.name).")
             }
             .font(.callout).foregroundStyle(.secondary).padding(.top, 4)
         }
@@ -73,7 +73,7 @@ struct CheckupView: View {
 
     private func stats(_ s: LibrarySnapshot) -> some View {
         HStack(spacing: 12) {
-            StatTile(symbol: "checkmark.shield.fill", color: Theme.good, value: Fmt.bytes(s.verified.bytes), label: "checked safe in Google Drive") {
+            StatTile(symbol: "checkmark.shield.fill", color: Theme.good, value: Fmt.bytes(s.verified.bytes), label: "checked safe in \(Backup.name)") {
                 model.statDetail = .verified
             }
             StatTile(symbol: "iphone", color: Tab.backup.color, value: Fmt.bytes(s.removed.total.bytes), label: "freed on the phone so far") {

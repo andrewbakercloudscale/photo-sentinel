@@ -58,7 +58,7 @@ struct ActivityView: View {
                                 }
                             }
                         }
-                        Text("A removal never resumes by itself. Copy, upload and check steps are safe to repeat: anything already verified in Google Drive is skipped.")
+                        Text("A removal never resumes by itself. Copy, upload and check steps are safe to repeat: anything already verified in \(Backup.name) is skipped.")
                             .font(.callout).foregroundStyle(.secondary).padding(.top, 4)
                     }
                 }
@@ -183,7 +183,7 @@ struct TaskRow: View {
         switch status.task.kind {
         case .audit:
             guard let r = status.decode(AuditReport.self) else { return "" }
-            return r.clean ? "\(Fmt.count(r.matched ?? 0)) items in Google Drive, every hash matches." : "Google Drive is missing items or hashes differ."
+            return r.clean ? "\(Fmt.count(r.matched ?? 0)) items in \(Backup.name), every hash matches." : "\(Backup.name) is missing items or hashes differ."
         case .plan:
             guard let p = status.decode(RemovalPlan.self) else { return "" }
             return "\(Fmt.count(p.eligible)) can go (\(Fmt.bytes(p.eligibleBytes))), \(Fmt.count(p.blocked)) stay."
@@ -195,9 +195,9 @@ struct TaskRow: View {
             return "\(Fmt.count(r.verified)) of \(Fmt.count(r.files.count)) downloaded and matched their fingerprint."
         case .refile:
             guard let r = status.decode(RefileReport.self) else { return "" }
-            return "Moved \(Fmt.count(r.moved ?? 0)) of \(Fmt.count(r.toMove)) in Google Drive, each found by its fingerprint at the new place."
+            return "Moved \(Fmt.count(r.moved ?? 0)) of \(Fmt.count(r.toMove)) in \(Backup.name), each found by its fingerprint at the new place."
         case .backup:
-            return "Copied off the phone, uploaded, and checked in Google Drive."
+            return "Copied off the phone, uploaded, and checked in \(Backup.name)."
         case .places:
             guard let p = status.decode(PlacesReport.self) else { return "" }
             return p.degraded ?? "\(Fmt.count(p.located)) items placed in \(Fmt.count(p.places)) places."
@@ -206,7 +206,7 @@ struct TaskRow: View {
             return "Removed \(Fmt.count(p.removed ?? 0)), \(Fmt.bytes(p.bytesRemoved ?? 0))."
         case .livePhotos:
             guard let r = status.decode(LivePhotosReport.self) else { return "" }
-            var text = "\(Fmt.count(r.verified ?? 0)) of \(Fmt.count(r.planned)) Live Photos now have their moving part in Google Drive (\(Fmt.bytes(r.bytes ?? 0)))."
+            var text = "\(Fmt.count(r.verified ?? 0)) of \(Fmt.count(r.planned)) Live Photos now have their moving part in \(Backup.name) (\(Fmt.bytes(r.bytes ?? 0)))."
             if let failed = r.failed, failed > 0 { text += " \(Fmt.count(failed)) not done; running it again retries them." }
             if let stopped = r.stoppedEarly { text += " \(stopped)" }
             return text

@@ -78,9 +78,9 @@ extension Ledger {
                 FROM assets a
                 """)[0]
             d.parts = [
-                .init(title: "Your iPhone", slices: [slice("this", "Checked safe in Google Drive", tally(p, 0)),
-                                                     slice("todo", "Not in Google Drive yet", tally(p, 2))]),
-                .init(title: "Everything checked in Google Drive", slices: [slice("this", "Still on your iPhone", tally(p, 0)),
+                .init(title: "Your iPhone", slices: [slice("this", "Checked safe in \(Backup.name)", tally(p, 0)),
+                                                     slice("todo", "Not in \(Backup.name) yet", tally(p, 2))]),
+                .init(title: "Everything checked in \(Backup.name)", slices: [slice("this", "Still on your iPhone", tally(p, 0)),
                                                                             slice("gone", "Already removed from your iPhone", tally(p, 4))]),
             ]
         case .freed, .recentlyDeleted:

@@ -52,11 +52,11 @@ struct OnboardingView: View {
 
     private var promise: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Nothing leaves your iPhone until a copy is safely in your Google Drive, checked, and you say so.")
+            Text("Nothing leaves your iPhone until a copy is safely in your \(Backup.name), checked, and you say so.")
                 .font(.title3.weight(.semibold)).foregroundStyle(.white)
                 .padding(14).frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Theme.heroGradient))
-            point("icloud.and.arrow.up.fill", Tab.backup.color, "Back up", "to your own Google Drive, and check every copy.")
+            point("icloud.and.arrow.up.fill", Tab.backup.color, "Back up", "to your own \(Backup.name), and check every copy.")
             point("sparkles", Tab.cleanUp.color, "Clear out", "old videos, screenshots and WhatsApp clutter.")
             point("arrow.uturn.backward", Tab.bin.color, "Change your mind", "for 30 days: everything removed can come back.")
         }
@@ -88,7 +88,7 @@ struct OnboardingView: View {
                                 .foregroundStyle(.secondary).frame(width: 190, alignment: .leading)
                             Text(Fmt.bytes(c.total.bytes)).fontWeight(.semibold).monospacedDigit().frame(width: 70, alignment: .trailing)
                             Meter(value: c.coverage, color: c.coverage >= 0.999 ? Theme.good : Tab.backup.color, height: 6)
-                            Text("\(Fmt.pct(c.coverage)) in Google Drive").foregroundStyle(.secondary).monospacedDigit().frame(width: 90, alignment: .trailing)
+                            Text("\(Fmt.pct(c.coverage)) in \(Backup.name)").foregroundStyle(.secondary).monospacedDigit().frame(width: 90, alignment: .trailing)
                         }
                         .font(.callout)
                     }
@@ -106,7 +106,7 @@ struct OnboardingView: View {
     /// The choices, each with its effect beside it, then what the library itself suggests.
     private var options: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Pick how old things must be before they leave the phone. Every option backs up to Google Drive first, and nothing is removed until you confirm it.")
+            Text("Pick how old things must be before they leave the phone. Every option backs up to \(Backup.name) first, and nothing is removed until you confirm it.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             AgesCard(model: model)
             if !model.suggestions.isEmpty {

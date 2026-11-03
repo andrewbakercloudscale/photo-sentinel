@@ -47,7 +47,7 @@ struct AboutView: View {
                 Text("Photo Sentinel").font(.largeTitle.weight(.bold))
                 Text("Version \(Self.version) (build \(Self.build))").font(.title3.weight(.medium)).monospacedDigit()
                 UpdatesRow(updates: model.updates, busy: model.backupBusy).padding(.vertical, 4)
-                Text("The backup manager for your iPhone: everything copied to your own Google Drive and checked, then cleared off the phone with proof for every item.")
+                Text("The backup manager for your iPhone: everything copied to your own Google Drive or S3 and checked, then cleared off the phone with proof for every item.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 Button { ShareApp.show() } label: {
                     Label("Share with a friend", systemImage: "square.and.arrow.up")
@@ -64,7 +64,7 @@ struct AboutView: View {
                 Text("Andrew Baker").font(.title3.weight(.semibold))
                 Text("Group Chief Information Officer at Capitec Bank, and the person behind CloudScale Consulting. He writes about technology, leadership and the tools he builds at andrewbaker.ninja.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Text("Photo Sentinel started with an iPhone too full to use and a rule: nothing comes off the phone until Google Drive has a copy whose fingerprint matches.")
+                Text("Photo Sentinel started with an iPhone too full to use and a rule: nothing comes off the phone until your backup has a copy whose fingerprint matches.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             VStack(spacing: 6) {
@@ -204,7 +204,7 @@ enum ShareApp {
 
     static var message: String {
         """
-        I've been using Photo Sentinel, a free, open-source Mac app that backs up your iPhone's photos and videos to your own Google Drive, checks every copy, and then clears space on the phone, with proof for every item it removes.
+        I've been using Photo Sentinel, a free, open-source Mac app that backs up your iPhone's photos and videos to your own Google Drive or S3, checks every copy, and then clears space on the phone, with proof for every item it removes.
 
         It's free and the source is public: https://github.com/\(AboutView.repo)
         """
