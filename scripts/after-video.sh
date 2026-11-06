@@ -14,7 +14,7 @@
 # removal is gated on Drive now (docs/SAFETY.md 1b), so there is nothing to hold
 # them for and holding would only fill the disk.
 set -u
-LOG=~/.iphone-image/cycle.log
+LOG=~/.photo-sentinel/cycle.log
 say() { echo "[$(date '+%m-%d %H:%M:%S')] [chain] $*" | tee -a "$LOG"; }
 
 say "waiting for the camera/video cycle to end"
@@ -26,4 +26,4 @@ if ! grep "camera/video\]\|\[video\]" "$LOG" | tail -n 8 | grep -q "nothing left
 fi
 
 say "video job finished. Starting screenshots older than 1y"
-exec ~/.iphone-image/cycle.sh photo 4 screenshot 1y
+exec ~/.photo-sentinel/cycle.sh photo 4 screenshot 1y

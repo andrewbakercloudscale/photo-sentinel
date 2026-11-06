@@ -373,14 +373,14 @@ final class JobsTests: XCTestCase {
 
     func testAliveProcessMakesItRunningAndADeadRunningJobStopped() {
         let more = log + "\n[10-25 17:47:54] [whatsapp/photo] fetching the next chunk"
-        let ps = ["/bin/bash /Users/x/.iphone-image/cycle.sh photo 40 whatsapp 18m", "grep cycle.sh"]
+        let ps = ["/bin/bash /Users/x/.photo-sentinel/cycle.sh photo 40 whatsapp 18m", "grep cycle.sh"]
         XCTAssertEqual(Jobs.read(log: more, processes: ps).first?.state, .running)
         guard case .stopped = Jobs.read(log: more, processes: []).first?.state else { return XCTFail() }
     }
 
     func testHotspotPauseSurvivesWhileAlive() {
         let paused = log + "\n[10-25 18:00:00] [whatsapp/photo] on a metered connection (phone hotspot). PAUSED until back on normal wifi."
-        let ps = ["caffeinate -dimsu /Users/x/.iphone-image/cycle.sh photo 40 whatsapp 18m"]
+        let ps = ["caffeinate -dimsu /Users/x/.photo-sentinel/cycle.sh photo 40 whatsapp 18m"]
         guard case .paused = Jobs.read(log: paused, processes: ps).first?.state else { return XCTFail() }
     }
 
@@ -517,12 +517,12 @@ final class JobsTests: XCTestCase {
 
     func testStoppingAJobTakesEverythingUnderItAndNothingElse() {
         let table = """
-          100     1 /bin/bash /Users/x/.iphone-image/cycle.sh video 40 whatsapp 18m
-          101   100 caffeinate -dimsu /Users/x/.iphone-image/cycle.sh video 40 whatsapp 18m
+          100     1 /bin/bash /Users/x/.photo-sentinel/cycle.sh video 40 whatsapp 18m
+          101   100 caffeinate -dimsu /Users/x/.photo-sentinel/cycle.sh video 40 whatsapp 18m
           102   100 ./.venv/bin/python -m iphone_image cloud --source whatsapp --apply
           103   102 rclone copy /Users/x/Desktop/iphone/whatsapp gdrive:Archive
-          104     1 /bin/bash /Users/x/.iphone-image/watch-job.sh whatsapp 18m
-          200     1 /bin/bash /Users/x/.iphone-image/cycle.sh photo 40 camera
+          104     1 /bin/bash /Users/x/.photo-sentinel/watch-job.sh whatsapp 18m
+          200     1 /bin/bash /Users/x/.photo-sentinel/cycle.sh photo 40 camera
           300     1 rclone lsjson gdrive:Archive
         """
         XCTAssertEqual(Jobs.jobProcesses(source: "whatsapp", table: table), [100, 101, 102, 103, 104])
@@ -780,7 +780,7 @@ final class GooglePhotosTests: XCTestCase {
             banked 137/137 verified, 0.90 GB sent at 1.00 MB/s
         [10-28 09:20:00] [camera/photo] Google Photos: sending a copy of what Google Drive verified
         """
-        let ps = ["/bin/bash /Users/x/.iphone-image/cycle.sh photo 40 camera"]
+        let ps = ["/bin/bash /Users/x/.photo-sentinel/cycle.sh photo 40 camera"]
         var j = Jobs.read(log: log, processes: ps)[0]
         XCTAssertEqual(j.state, .running)
         XCTAssertEqual(j.phase, .googlePhotos)

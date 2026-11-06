@@ -8,8 +8,8 @@
 set -u
 SOURCE=${1:?usage: watch-job.sh <source> [older-than]}
 OLDER=${2:-}
-LOG=~/.iphone-image/watch.log
-CYCLE=~/.iphone-image/cycle.log
+LOG=~/.photo-sentinel/watch.log
+CYCLE=~/.photo-sentinel/cycle.log
 REPO=/Users/cp363412/Desktop/github/photo-sentinel
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 running() { pgrep -f "cycle.sh (photo|video) [0-9]+ $SOURCE" >/dev/null; }

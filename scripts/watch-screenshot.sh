@@ -4,8 +4,8 @@
 # sound when it is gone. Added 2026-09-28: after-video.sh started the screenshot
 # job with nothing watching it.
 set -u
-LOG=~/.iphone-image/watch.log
-CYCLE=~/.iphone-image/cycle.log
+LOG=~/.photo-sentinel/watch.log
+CYCLE=~/.photo-sentinel/cycle.log
 REPO=/Users/cp363412/Desktop/github/photo-sentinel
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 left() {

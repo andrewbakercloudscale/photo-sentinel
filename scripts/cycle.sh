@@ -37,7 +37,7 @@ esac
 cd /Users/cp363412/Desktop/github/photo-sentinel || exit 1
 export PYTHONPATH=src
 PY=./.venv/bin/python
-LOG=~/.iphone-image/cycle.log
+LOG=~/.photo-sentinel/cycle.log
 DB=~/Desktop/iphone/iphone-image.sqlite
 TAG="$SOURCE/$TYPE"
 
@@ -173,7 +173,7 @@ upload_now() {
 # read back from Drive. It never stops the backup: a failure is logged and the
 # job carries on. Its own output goes to google-photos.log, not here, so its
 # rclone stats cannot be read as the Drive upload's progress.
-GPHOTOS_LOG=~/.iphone-image/google-photos.log
+GPHOTOS_LOG=~/.photo-sentinel/google-photos.log
 gphotos_follows() {
   [ "$($PY -c 'import sys
 from iphone_image.config import load_config

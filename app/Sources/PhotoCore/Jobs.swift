@@ -2,7 +2,7 @@ import Foundation
 
 /// A background backup job, as `cycle.sh <type> <cycles> <source> [older]` runs it today.
 ///
-/// Phase A has no job table of its own: state comes from `~/.iphone-image/cycle.log`
+/// Phase A has no job table of its own: state comes from `~/.photo-sentinel/cycle.log`
 /// (every line `[MM-dd HH:mm:ss] [source/type] message`) and from whether a matching
 /// process is alive. The log line wording is cycle.sh's; `JobsTests` pins each one.
 public struct Job: Identifiable, Hashable, Sendable {
@@ -154,7 +154,14 @@ public enum Jobs {
         return queuedSources.contains(source) ? .queued : .idle
     }
 
-    public static let home = NSString(string: "~/.iphone-image").expandingTildeInPath
+    /// The state folder. Installs from before the rename (Nov 2026) keep `~/.iphone-image`
+    /// until it is moved; the CLI makes the same choice, so both always read one folder.
+    public static let home: String = {
+        let path = { (p: String) in NSString(string: p).expandingTildeInPath }
+        let current = path("~/.photo-sentinel"), old = path("~/.iphone-image")
+        let fm = FileManager.default
+        return !fm.fileExists(atPath: current) && fm.fileExists(atPath: old) ? old : current
+    }()
     public static var logPath: String { home + "/cycle.log" }
     public static var cyclePath: String { home + "/cycle.sh" }
 
@@ -377,7 +384,7 @@ public enum Jobs {
         return Int(s[r.upperBound...].prefix { $0.isNumber })
     }
 
-    /// `/bin/bash /Users/x/.iphone-image/cycle.sh photo 40 whatsapp 18m`, not the caffeinate
+    /// `/bin/bash /Users/x/.photo-sentinel/cycle.sh photo 40 whatsapp 18m`, not the caffeinate
     /// wrapper (which names it too, so either matches) and not a grep.
     static func isCycle(_ command: String, type: String, source: String) -> Bool {
         let words = command.split(separator: " ").map(String.init)

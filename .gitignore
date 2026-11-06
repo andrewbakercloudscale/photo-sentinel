@@ -21,6 +21,7 @@ helper/*.xcodeproj
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+.photo-sentinel/
 .iphone-image/
 logs/
 *.log

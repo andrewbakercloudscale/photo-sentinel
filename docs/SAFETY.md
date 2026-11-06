@@ -251,7 +251,7 @@ There are two separate undo paths and they are easy to confuse.
   meaning `.partial` fragments and failed downloads, are unlinked directly, because
   filling the Trash with junk is how a safety feature stops being used.
 - Every asset removed from the iPhone leaves a recycle bin entry on the Mac, under
-  `~/.iphone-image/recycle-bin/<campaign>/<date>/`. It always records a manifest row
+  `~/.photo-sentinel/recycle-bin/<campaign>/<date>/`. It always records a manifest row
   with the asset id, original device path, SHA256, capture date, classification, the
   evidence that made it eligible, and when it was removed.
 

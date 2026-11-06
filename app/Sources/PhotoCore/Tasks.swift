@@ -2,7 +2,7 @@ import Foundation
 
 /// A CLI command the app started: an audit, a removal plan, a removal.
 ///
-/// Each runs detached, writing into its own folder under `~/.iphone-image/ui/`, so it
+/// Each runs detached, writing into its own folder under `~/.photo-sentinel/ui/`, so it
 /// survives the app quitting or crashing and the app picks it up again on launch. That is
 /// what lets Activity show it as a job in flight and lets a removal's result be read back
 /// after the fact, rather than living only in a window that has gone.

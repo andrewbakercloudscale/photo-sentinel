@@ -1293,11 +1293,11 @@ safety:
   require_cloud_verification: true
 
 database:
-  path: "~/.iphone-image/iphone-image.sqlite"
+  path: "~/.photo-sentinel/iphone-image.sqlite"
 
 logging:
   level: info
-  path: "~/.iphone-image/logs"
+  path: "~/.photo-sentinel/logs"
 ```
 
 ---

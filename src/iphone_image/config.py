@@ -28,7 +28,17 @@ from .organize.paths import validate_pattern
 from .retention import format_duration, parse_duration
 from .selector import MEDIA_TYPES, SelectorError, parse_size, resolve_channel
 
-DEFAULT_CONFIG_PATH = Path("~/.iphone-image/config.yaml").expanduser()
+
+def _state_dir() -> Path:
+    """The state folder. Installs from before the rename (Nov 2026) keep ~/.iphone-image
+    until it is moved; the app makes the same choice, so both always read one folder."""
+    current = Path("~/.photo-sentinel").expanduser()
+    old = Path("~/.iphone-image").expanduser()
+    return old if not current.exists() and old.exists() else current
+
+
+STATE_DIR = _state_dir()
+DEFAULT_CONFIG_PATH = STATE_DIR / "config.yaml"
 
 CONFIG_VERSION = 1
 
@@ -332,7 +342,7 @@ class SafetyConfig(Strict):
 
 class RecycleBinConfig(Strict):
     enabled: bool = True
-    path: ExpandedPath = Path("~/.iphone-image/recycle-bin").expanduser()
+    path: ExpandedPath = STATE_DIR / "recycle-bin"
     retention: Duration = timedelta(days=90)
     use_macos_trash: bool = True
 
@@ -378,12 +388,12 @@ class ChunkingConfig(Strict):
 
 
 class DatabaseConfig(Strict):
-    path: ExpandedPath = Path("~/.iphone-image/iphone-image.sqlite").expanduser()
+    path: ExpandedPath = STATE_DIR / "iphone-image.sqlite"
 
 
 class LoggingConfig(Strict):
     level: LogLevel = LogLevel.INFO
-    path: ExpandedPath = Path("~/.iphone-image/logs").expanduser()
+    path: ExpandedPath = STATE_DIR / "logs"
 
 
 class NetworkConfig(Strict):

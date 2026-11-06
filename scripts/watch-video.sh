@@ -4,8 +4,8 @@
 # log line nobody reads is how 12 hours were lost on 2026-09-19/20 and 15 more on
 # 09-20/21.
 set -u
-LOG=~/.iphone-image/watch.log
-CYCLE=~/.iphone-image/cycle.log
+LOG=~/.photo-sentinel/watch.log
+CYCLE=~/.photo-sentinel/cycle.log
 REPO=/Users/cp363412/Desktop/github/photo-sentinel
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 left() {

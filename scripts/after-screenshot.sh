@@ -11,7 +11,7 @@
 # time. Each step starts only if the one before it FINISHED, so a stop on the
 # disk floor or a failed release is not buried under the next job.
 set -u
-LOG=~/.iphone-image/cycle.log
+LOG=~/.photo-sentinel/cycle.log
 say() { echo "[$(date '+%m-%d %H:%M:%S')] [chain] $*" | tee -a "$LOG"; }
 finished() { grep "\[$1\]" "$LOG" | tail -n 8 | grep -q "nothing left to fetch"; }
 
@@ -22,14 +22,14 @@ if ! finished "screenshot/photo"; then
   exit 3
 fi
 
-nohup ~/.iphone-image/watch-job.sh whatsapp 18m > /dev/null 2>&1 &
+nohup ~/.photo-sentinel/watch-job.sh whatsapp 18m > /dev/null 2>&1 &
 
 say "screenshots finished. Starting WhatsApp photos older than 18m"
-caffeinate -dimsu ~/.iphone-image/cycle.sh photo 40 whatsapp 18m
+caffeinate -dimsu ~/.photo-sentinel/cycle.sh photo 40 whatsapp 18m
 if ! finished "whatsapp/photo"; then
   say "the WhatsApp photo cycle did not finish cleanly, so WhatsApp videos are NOT starting"
   exit 3
 fi
 
 say "WhatsApp photos finished. Starting WhatsApp videos older than 18m"
-exec caffeinate -dimsu ~/.iphone-image/cycle.sh video 40 whatsapp 18m
+exec caffeinate -dimsu ~/.photo-sentinel/cycle.sh video 40 whatsapp 18m

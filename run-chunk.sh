@@ -22,7 +22,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-STATE_DIR="${IIM_STATE_DIR:-$HOME/.iphone-image}"
+STATE_DIR="${IIM_STATE_DIR:-$HOME/.photo-sentinel}"
 LOG="$STATE_DIR/chunk.log"
 PIDFILE="$STATE_DIR/chunk.pid"
 PYTHON="$HERE/.venv/bin/python"

@@ -105,16 +105,16 @@ safety:
 
 recycle_bin:
   enabled: true
-  path: "~/.iphone-image/recycle-bin"
+  path: "~/.photo-sentinel/recycle-bin"
   retention: 90d
   use_macos_trash: true
 
 database:
-  path: "~/.iphone-image/iphone-image.sqlite"
+  path: "~/.photo-sentinel/iphone-image.sqlite"
 
 logging:
   level: info                 # debug | info | warning | error
-  path: "~/.iphone-image/logs"
+  path: "~/.photo-sentinel/logs"
 
 performance:
   local_transfer_workers: 2   # device stability beats throughput

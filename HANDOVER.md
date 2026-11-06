@@ -20,9 +20,9 @@ wifi. Nothing to do except get the Mac on wifi, on mains, lid open.
 
 **If the Mac rebooted / processes are gone**, restart (each resumes from the ledger):
 ```bash
-cd ~ && nohup caffeinate -dimsu ~/.iphone-image/cycle.sh photo 40 screenshot 1y > ~/.iphone-image/cycle-screenshot.out 2>&1 & disown
-nohup ~/.iphone-image/watch-screenshot.sh > /dev/null 2>&1 & disown
-nohup ~/.iphone-image/after-screenshot.sh > ~/.iphone-image/after-screenshot.out 2>&1 & disown
+cd ~ && nohup caffeinate -dimsu ~/.photo-sentinel/cycle.sh photo 40 screenshot 1y > ~/.photo-sentinel/cycle-screenshot.out 2>&1 & disown
+nohup ~/.photo-sentinel/watch-screenshot.sh > /dev/null 2>&1 & disown
+nohup ~/.photo-sentinel/after-screenshot.sh > ~/.photo-sentinel/after-screenshot.out 2>&1 & disown
 ```
 Check `pgrep -fl "cycle.sh|after-|watch-"` first -- never two exporters at once.
 
@@ -39,7 +39,7 @@ Check `pgrep -fl "cycle.sh|after-|watch-"` first -- never two exporters at once.
 
 ### Next actions, in order
 
-1. Wait for the screenshot job (needs wifi). If `watch-screenshot.sh` reports a stop, read the last `[screenshot/photo]` lines in `~/.iphone-image/cycle.log`.
+1. Wait for the screenshot job (needs wifi). If `watch-screenshot.sh` reports a stop, read the last `[screenshot/photo]` lines in `~/.photo-sentinel/cycle.log`.
 2. When screenshots finish: `audit` (must exit clean), then
    `remove-from-iphone --source screenshot --older-than 1y`, then `--apply --confirm "<phrase>"`.
    The owner clicks Delete on Apple's dialog. Do NOT describe that as "manual
@@ -53,8 +53,8 @@ Check `pgrep -fl "cycle.sh|after-|watch-"` first -- never two exporters at once.
 - **Release retries** Drive quota (backoff 2->30 min, **exit 6** after 3h) and network errors (`release_with_retry`).
 - **Hotspot guard**: `metered()` = gateway 172.20.10.x OR macOS `IsExpensive`. `wait_off_metered` pauses with no time cap; `metered_guard` (background) kills an in-flight sync/upload within 20s of switching. Both safe to kill (hash-banked uploads; `.partial` fetches swept).
 - **Bin check** recognises Finder's timestamp renames (`IMG_0001.PNG 02-49-53-988.PNG`) -- screenshots reuse names across years; 1,114 such names stopped the job at 02:50 on 09-29 (~6h lost).
-- **WhatsApp feature**: `cloud.whatsapp_destination`; `organization.flat_channels` (flat folder, `IMG_1 (1).jpg` numbering); `remove_from_iphone.keep_user_album_channels` (keeps items in any album not in `remove.py` `AUTOMATIC_ALBUMS`, ignoring the "WhatsApp" source album; unknown names keep). All three set in `~/.iphone-image/config.yaml` (backup alongside). Tests: `tests/test_whatsapp.py`.
-- Scripts added (copies in `scripts/`, live in `~/.iphone-image/`): `watch-screenshot.sh`, `watch-job.sh <source> [older]`, `after-screenshot.sh`.
+- **WhatsApp feature**: `cloud.whatsapp_destination`; `organization.flat_channels` (flat folder, `IMG_1 (1).jpg` numbering); `remove_from_iphone.keep_user_album_channels` (keeps items in any album not in `remove.py` `AUTOMATIC_ALBUMS`, ignoring the "WhatsApp" source album; unknown names keep). All three set in `~/.photo-sentinel/config.yaml` (backup alongside). Tests: `tests/test_whatsapp.py`.
+- Scripts added (copies in `scripts/`, live in `~/.photo-sentinel/`): `watch-screenshot.sh`, `watch-job.sh <source> [older]`, `after-screenshot.sh`.
 - `chunk_bytes` is **2GB** (config comment explains). Needs chunk + 10 GiB floor free; 15 GiB free at handover.
 - The job died on battery 09-24 (sleep) and ran on battery again 09-28 -- **keep it on mains**.
 
@@ -135,10 +135,10 @@ cheap insurance and the rule that has caught real problems before.
    are NOT..."), look at what it flagged before emptying by hand.
 2. **Restart the video job** (it resumes from the ledger):
    ```bash
-   cd ~ && nohup caffeinate -dimsu ~/.iphone-image/cycle.sh video 40 \
-     > ~/.iphone-image/cycle-video.out 2>&1 & disown
-   nohup ~/.iphone-image/after-video.sh > ~/.iphone-image/after-video.out 2>&1 & disown
-   nohup ~/.iphone-image/watch-video.sh > /dev/null 2>&1 & disown
+   cd ~ && nohup caffeinate -dimsu ~/.photo-sentinel/cycle.sh video 40 \
+     > ~/.photo-sentinel/cycle-video.out 2>&1 & disown
+   nohup ~/.photo-sentinel/after-video.sh > ~/.photo-sentinel/after-video.out 2>&1 & disown
+   nohup ~/.photo-sentinel/watch-video.sh > /dev/null 2>&1 & disown
    ```
    Exit codes: **6** Drive quota still refused after 3h of release retries
    (added 09-28; quota and network errors in release now back off and retry);
@@ -199,7 +199,7 @@ changing `cycle.sh` again, do not just re-diagnose from scratch)
   raises a macOS notification.
 - **Never edit `cycle.sh` in place while a job runs from it.** Bash reads
   scripts incrementally. Write `cycle.sh.new` and `mv` it over. Copies live in
-  `scripts/` in this repo; the running copy is `~/.iphone-image/cycle.sh` and
+  `scripts/` in this repo; the running copy is `~/.photo-sentinel/cycle.sh` and
   is **not in git** -- copy back after editing.
 - **On battery the Mac sleeps despite `caffeinate`.** Keep it plugged in with
   the lid open; this has cost hours more than once.
@@ -242,9 +242,9 @@ changing `cycle.sh` again, do not just re-diagnose from scratch)
 | repo | `~/Desktop/github/photo-sentinel` (public, MIT, `main`) |
 | run it | `export PYTHONPATH=src; ./.venv/bin/python -m iphone_image <verb>` |
 | ledger | `~/Desktop/iphone/iphone-image.sqlite` (backup `...backup-20260917-215225`, pre-repair) |
-| config | `~/.iphone-image/config.yaml` (backups alongside) |
-| jobs | `~/.iphone-image/cycle.sh [photo\|video] [cycles] [source] [older-than]`, `after-video.sh`, `watch-video.sh` -- not in git; copies tracked in `scripts/` |
-| logs | `~/.iphone-image/cycle.log` (rolled 09-19: `cycle.log.through-2026-09-19-0800`), `~/.iphone-image/watch.log` |
+| config | `~/.photo-sentinel/config.yaml` (backups alongside) |
+| jobs | `~/.photo-sentinel/cycle.sh [photo\|video] [cycles] [source] [older-than]`, `after-video.sh`, `watch-video.sh` -- not in git; copies tracked in `scripts/` |
+| logs | `~/.photo-sentinel/cycle.log` (rolled 09-19: `cycle.log.through-2026-09-19-0800`), `~/.photo-sentinel/watch.log` |
 | verbs | `doctor scan list sync cloud release remove-from-iphone relocate audit status` |
 
 ---
@@ -358,7 +358,7 @@ ledger cannot verify the ledger.**
     *chunk's running total* beside each filename, so late in a run an ordinary
     2.4 MB JPEG printed as "3.0 GB". Display only; nothing about what was
     fetched or verified was wrong. `a760f02`.
-11. **Ran an unattended fetch -> upload -> release cycle** (`~/.iphone-image/cycle.sh`)
+11. **Ran an unattended fetch -> upload -> release cycle** (`~/.photo-sentinel/cycle.sh`)
     to completion: the last 2,962 undownloaded camera photos, fetched,
     uploaded, verified, released, with a 10 GB disk floor re-checked before
     every fetch. It finished on its own and reported "nothing left to fetch."
@@ -416,7 +416,7 @@ places are pinned by tests: `split_cloud_path` matches longest-first;
 `backfill_archive_claims` used to iterate a *set* of destinations, whose order is
 arbitrary, and would strip the parent prefix first; and `audit.remote` excludes a
 parent's nested files so each screenshot is not counted twice. Commit `8b76cd2`.
-It runs automatically after the video job (`~/.iphone-image/after-video.sh`).
+It runs automatically after the video job (`~/.photo-sentinel/after-video.sh`).
 
 **4. The video job was killed by a sleeping laptop, and the tool could not tell.**
 On battery `caffeinate` does not prevent system sleep (`PreventSystemSleep 0`,
@@ -526,13 +526,13 @@ Selector: `--source --type --older-than --newer-than --year --min-size
 **The unattended cycle:**
 
 ```bash
-~/.iphone-image/cycle.sh [photo|video] [cycles] [source] [older-than]   # defaults: photo 12 camera
-RELEASE=0 ~/.iphone-image/cycle.sh ...              # hold the Mac copy; nothing needs it now (see 3b)
-~/.iphone-image/cycle.sh video 25                   # the video job, started 2026-09-18
+~/.photo-sentinel/cycle.sh [photo|video] [cycles] [source] [older-than]   # defaults: photo 12 camera
+RELEASE=0 ~/.photo-sentinel/cycle.sh ...              # hold the Mac copy; nothing needs it now (see 3b)
+~/.photo-sentinel/cycle.sh video 25                   # the video job, started 2026-09-18
 ```
 
 Started under `nohup caffeinate -dimsu`, so it survives closing the terminal
-and keeps the Mac awake. Logs to `~/.iphone-image/cycle.log`, every line tagged
+and keeps the Mac awake. Logs to `~/.photo-sentinel/cycle.log`, every line tagged
 with the type. Loops release -> check-nothing-to-fetch -> check-floor -> fetch
 -> upload and stops cleanly when there is nothing left to fetch.
 
@@ -948,6 +948,6 @@ user today and deliberately left as an open decision, not started.
 | `src/iphone_image/cloud.py` | Per-folder batching, the stall-vs-slow distinction, `destination_for` / `split_cloud_path` for the two-archive split. |
 | `src/iphone_image/relocate.py` | The un-naming guard (`unnaming()`), added today after nearly stripping 8,590 folder names. |
 | `src/iphone_image/photos/places.py` | Where place names come from, and why their coverage is not stable. |
-| `~/.iphone-image/cycle.sh` | The unattended fetch/upload/release loop used today. Gitignored, local-only, photo-only as written. |
+| `~/.photo-sentinel/cycle.sh` | The unattended fetch/upload/release loop used today. Gitignored, local-only, photo-only as written. |
 | `spikes/iimphotos/Sources/iimphotos/Delete.swift` | The PhotoKit deletion primitive: confirms by re-fetching, never guesses at a missing identifier. |
 | `docs/SPEC.md` | The original specification, kept verbatim; `PLAN.md` section 7 lists what is superseded. |

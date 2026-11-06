@@ -4,7 +4,7 @@ SwiftUI front end for iphone-image. Design: [`../docs/MAC-APP-DESIGN.md`](../doc
 
 **Every photo operation runs from the app** (owner, 2026-10-25). The app never writes the
 ledger itself; it reads it (`~/Desktop/iphone/iphone-image.sqlite`, read-only, safe while a
-job writes) and `~/.iphone-image/cycle.log`, and acts only through the engine:
+job writes) and `~/.photo-sentinel/cycle.log`, and acts only through the engine:
 
 | Action | What runs | Where it is |
 |---|---|---|
@@ -18,7 +18,7 @@ job writes) and `~/.iphone-image/cycle.log`, and acts only through the engine:
 | Finish a removal | `settle --apply`: a later scan records what Photos actually deleted | Activity, Checkup |
 | Recover | `recover --id …`: Drive → new folder, each file hash-checked; "Add to Photos" only on click | Bin |
 
-CLI actions run detached under `~/.iphone-image/ui/<id>/` (`task.json`, `out.json`,
+CLI actions run detached under `~/.photo-sentinel/ui/<id>/` (`task.json`, `out.json`,
 `err.log`, `exit`), so they outlive the app and show in Activity when it reopens.
 Removal stays locked until a Google Drive check from the last 6 hours is clean.
 Clean-up numbers are estimates that mirror `remove.py`'s per-asset rules; the plan is the truth.
