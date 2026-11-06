@@ -1,7 +1,7 @@
 #!/bin/bash
 # Installs Photo Sentinel from https://github.com/andrewbakercloudscale/photo-sentinel
 set -euo pipefail
-DIR="$HOME/Desktop/github/iphone-image-manager"   # the app runs its engine from here
+DIR="$HOME/Desktop/github/photo-sentinel"   # the app runs its engine from here
 if ! xcode-select -p >/dev/null 2>&1; then
   xcode-select --install
   echo "Finish installing the command line tools in the window that opened, then paste this again."

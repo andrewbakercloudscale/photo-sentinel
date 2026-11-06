@@ -6,7 +6,7 @@
 set -u
 LOG=~/.iphone-image/watch.log
 CYCLE=~/.iphone-image/cycle.log
-REPO=/Users/cp363412/Desktop/github/iphone-image-manager
+REPO=/Users/cp363412/Desktop/github/photo-sentinel
 say() { echo "[$(date '+%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 left() {
   (cd "$REPO" && PYTHONPATH=src ./.venv/bin/python -c "

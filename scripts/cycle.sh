@@ -34,7 +34,7 @@ case "$CYCLES" in
   ''|*[!0-9]*) echo "cycles must be a number" >&2; exit 64 ;;
 esac
 
-cd /Users/cp363412/Desktop/github/iphone-image-manager || exit 1
+cd /Users/cp363412/Desktop/github/photo-sentinel || exit 1
 export PYTHONPATH=src
 PY=./.venv/bin/python
 LOG=~/.iphone-image/cycle.log

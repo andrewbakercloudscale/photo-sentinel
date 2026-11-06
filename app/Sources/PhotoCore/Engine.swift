@@ -59,7 +59,15 @@ public struct CLIEngine: Engine {
     public var ledgerPath: String
     public var recipes: [Recipe]
 
-    public static let defaultRepo = NSString(string: "~/Desktop/github/iphone-image-manager").expandingTildeInPath
+    /// The working copy the installer clones. Installs from before the rename (Nov 2026) cloned
+    /// to `iphone-image-manager`: an update must keep finding those.
+    public static let defaultRepo: String = {
+        let path = { (p: String) in NSString(string: p).expandingTildeInPath }
+        let current = path("~/Desktop/github/photo-sentinel")
+        let old = path("~/Desktop/github/iphone-image-manager")
+        let fm = FileManager.default
+        return !fm.fileExists(atPath: current) && fm.fileExists(atPath: old) ? old : current
+    }()
 
     public init(repo: String = CLIEngine.defaultRepo, ledgerPath: String = Ledger.defaultPath, recipes: [Recipe] = Recipe.defaults) {
         self.repo = repo

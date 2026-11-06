@@ -1600,7 +1600,7 @@ Metadata should not be stripped during transfer.
 Suggested structure:
 
 ```text
-iphone-image-manager/
+photo-sentinel/
 │
 ├── cli/
 │   ├── commands/
@@ -2195,7 +2195,7 @@ iPhone image export Mac
 Possible repository name:
 
 ```text
-iphone-image-manager
+photo-sentinel
 ```
 
 Possible CLI package name:

@@ -152,7 +152,7 @@ cheap insurance and the rule that has caught real problems before.
    at the Mac -- Apple's confirmation dialog can only be clicked there, and it
    silently times out (25 min) with nothing removed if nobody does:
    ```bash
-   cd ~/Desktop/github/iphone-image-manager && export PYTHONPATH=src
+   cd ~/Desktop/github/photo-sentinel && export PYTHONPATH=src
    ./.venv/bin/python -m iphone_image audit                     # ~5 min, must exit 0
    ./.venv/bin/python -m iphone_image remove-from-iphone --source camera --type video --older-than 1y
    # read the plan (numbers will have moved on), then re-run with the
@@ -239,7 +239,7 @@ changing `cycle.sh` again, do not just re-diagnose from scratch)
 
 | | |
 |---|---|
-| repo | `~/Desktop/github/iphone-image-manager` (public, MIT, `main`) |
+| repo | `~/Desktop/github/photo-sentinel` (public, MIT, `main`) |
 | run it | `export PYTHONPATH=src; ./.venv/bin/python -m iphone_image <verb>` |
 | ledger | `~/Desktop/iphone/iphone-image.sqlite` (backup `...backup-20260917-215225`, pre-repair) |
 | config | `~/.iphone-image/config.yaml` (backups alongside) |
@@ -253,7 +253,7 @@ changing `cycle.sh` again, do not just re-diagnose from scratch)
 
 `iphone-image` is a macOS CLI that inventories, backs up, verifies and offloads
 iPhone media. Repo: **https://github.com/andrewbakercloudscale/photo-sentinel**
-(public, MIT). Working copy: `~/Desktop/github/iphone-image-manager`.
+(public, MIT). Working copy: `~/Desktop/github/photo-sentinel`.
 
 The core promise, unchanged: **nothing is ever removed from the phone that is
 not already on the Mac, reviewed, and verified.** See `docs/SAFETY.md`.
@@ -498,7 +498,7 @@ the first time it has actually been true of 13 GB of photographs, and it is why
 ## 5. How to run it
 
 ```bash
-cd ~/Desktop/github/iphone-image-manager
+cd ~/Desktop/github/photo-sentinel
 export PYTHONPATH=src
 ./.venv/bin/python -m iphone_image <command>
 ```

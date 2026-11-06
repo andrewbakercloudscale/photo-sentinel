@@ -13,7 +13,7 @@ reading the device's capability list, not by deleting one of your photographs.
 ## Run it
 
 ```bash
-cd /path/to/iphone-image-manager
+cd /path/to/photo-sentinel
 python3 spikes/run_p0.py
 ```
 

@@ -70,7 +70,7 @@ app saved each item, so "clean up WhatsApp" is exact rather than a filename gues
 
 Paste this into Terminal. It installs what is missing (Xcode command line tools,
 Homebrew, Python 3.14, exiftool, ffmpeg, rclone), clones this repo to
-`~/Desktop/github/iphone-image-manager`, builds the app, installs it to
+`~/Desktop/github/photo-sentinel`, builds the app, installs it to
 `~/Applications` and opens it. Paste it again to update.
 
 ```bash
@@ -78,7 +78,7 @@ cat > /tmp/install-photo-sentinel.sh <<'EOF'
 #!/bin/bash
 # Installs Photo Sentinel from https://github.com/andrewbakercloudscale/photo-sentinel
 set -euo pipefail
-DIR="$HOME/Desktop/github/iphone-image-manager"   # the app runs its engine from here
+DIR="$HOME/Desktop/github/photo-sentinel"   # the app runs its engine from here
 if ! xcode-select -p >/dev/null 2>&1; then
   xcode-select --install
   echo "Finish installing the command line tools in the window that opened, then paste this again."
@@ -300,8 +300,8 @@ wherever your archive lives.
 ## Development
 
 ```bash
-git clone https://github.com/andrewbakercloudscale/photo-sentinel ~/Desktop/github/iphone-image-manager
-cd ~/Desktop/github/iphone-image-manager
+git clone https://github.com/andrewbakercloudscale/photo-sentinel ~/Desktop/github/photo-sentinel
+cd ~/Desktop/github/photo-sentinel
 
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
