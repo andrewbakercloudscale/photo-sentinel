@@ -72,7 +72,7 @@ public struct CLIEngine: Engine {
     }
 
     public func jobs() -> [Job] {
-        Jobs.read(log: Jobs.tail(), processes: Jobs.processes())
+        Jobs.current(processes: Jobs.processes())
     }
 
     /// `--skip-slow` keeps it to seconds; the slow checks copy the Photos database.

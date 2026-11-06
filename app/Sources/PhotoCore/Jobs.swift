@@ -160,6 +160,31 @@ public enum Jobs {
 
     /// Every job the log mentions, newest activity first, with whether it is alive.
     public static func read(log: String, processes: [String]) -> [Job] {
+        let (jobs, order) = parse(log: log)
+        return alive(jobs, order: order, processes: processes)
+    }
+
+    /// The jobs in the log at `logPath`, re-read only when the file has changed. With nothing
+    /// running the log does not move, and parsing its 4 MB tail every 15 seconds was most of
+    /// the app's idle CPU.
+    public static func current(processes: [String]) -> [Job] {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: logPath)
+        let stamp = LogStamp(size: (attrs?[.size] as? NSNumber)?.int64Value ?? -1,
+                             modified: (attrs?[.modificationDate] as? Date) ?? .distantPast)
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        if let c = cache, c.stamp == stamp { return alive(c.jobs, order: c.order, processes: processes) }
+        let (jobs, order) = parse(log: tail())
+        cache = ParsedLog(stamp: stamp, jobs: jobs, order: order)
+        return alive(jobs, order: order, processes: processes)
+    }
+
+    struct LogStamp: Equatable { let size: Int64; let modified: Date }
+    struct ParsedLog { let stamp: LogStamp; let jobs: [String: Job]; let order: [String] }
+    nonisolated(unsafe) static var cache: ParsedLog?
+    static let cacheLock = NSLock()
+
+    static func parse(log: String) -> (jobs: [String: Job], order: [String]) {
         var jobs: [String: Job] = [:]
         var order: [String] = []
         var current: String?
@@ -222,6 +247,11 @@ public enum Jobs {
             if jobs[key] == nil { order.append(key) }
             jobs[key] = job
         }
+        return (jobs, order)
+    }
+
+    static func alive(_ parsed: [String: Job], order: [String], processes: [String]) -> [Job] {
+        var jobs = parsed
         for key in order {
             guard var job = jobs[key] else { continue }
             let alive = processes.contains { isCycle($0, type: job.type, source: job.source) }
@@ -330,11 +360,17 @@ public enum Jobs {
     /// `  2026/10/26 09:57:22 NOTICE: ...` to its time, in this Mac's zone as rclone writes it.
     static func statsTime(_ line: Substring) -> Date? {
         let t = line.drop { $0 == " " }.prefix(19)
+        return statsFormatter.date(from: String(t))
+    }
+
+    /// One formatter for every line: building one per rclone stats line was half the parse.
+    /// DateFormatter is thread-safe for parsing since macOS 10.9.
+    nonisolated(unsafe) static let statsFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "yyyy/MM/dd HH:mm:ss"
-        return f.date(from: String(t))
-    }
+        return f
+    }()
 
     static func number(after marker: String, in s: String) -> Int? {
         guard let r = s.range(of: marker) else { return nil }

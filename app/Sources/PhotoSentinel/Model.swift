@@ -149,7 +149,7 @@ final class Model: ObservableObject {
                 self.loading = false
                 self.allProof = proof
                 self.notifyChanges(from: self.jobs, to: jobs)
-                self.jobs = jobs
+                if self.jobs != jobs { self.jobs = jobs }
                 switch result {
                 case .success(let s): self.library = s; self.error = nil; self.placesIfStale()
                 case .failure(let e): self.error = "Could not read the ledger: \(e)"
@@ -164,7 +164,7 @@ final class Model: ObservableObject {
             let jobs = engine.jobs()
             await MainActor.run {
                 self.notifyChanges(from: self.jobs, to: jobs)
-                self.jobs = jobs
+                if self.jobs != jobs { self.jobs = jobs }
                 self.pumpQueue()
             }
         }
@@ -188,7 +188,9 @@ final class Model: ObservableObject {
 
     func refreshTasks() {
         let before = Set(tasks.filter(\.running).map(\.task.id))
-        tasks = TaskStore.all()
+        let now = TaskStore.all()
+        // Every 3 seconds: assign only on a change, or SwiftUI redraws the window for nothing.
+        if now != tasks { tasks = now }
         // Something just finished: the ledger has moved.
         let ended = tasks.filter { before.contains($0.task.id) && !$0.running }
         for t in ended where t.task.kind != .places {
