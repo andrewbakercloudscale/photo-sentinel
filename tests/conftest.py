@@ -1,9 +1,21 @@
 from __future__ import annotations
 
+import atexit
+import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
+
+# Tests never touch the real home folder. Commands run without --config fall back to
+# ~/.photo-sentinel, and a test that wrote there once created a near-empty state folder
+# that the app then preferred over the real one. HOME is replaced before iphone_image is
+# imported, because config.STATE_DIR is worked out at import time; subprocesses inherit it.
+_TEST_HOME = tempfile.mkdtemp(prefix="photo-sentinel-test-home-")
+os.environ["HOME"] = _TEST_HOME
+atexit.register(shutil.rmtree, _TEST_HOME, ignore_errors=True)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
