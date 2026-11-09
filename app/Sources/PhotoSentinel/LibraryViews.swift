@@ -16,6 +16,7 @@ struct LibraryView: View {
                 }
                 MediaCharts(model: model)
                 KeepCard(model: model, library: s)
+                RulesCard()
                 SuggestionGrid(model: model)
                 CoverageCard(model: model, library: s)
                 PlacesCard(model: model, library: s)
