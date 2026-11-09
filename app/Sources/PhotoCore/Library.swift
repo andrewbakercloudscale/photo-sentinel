@@ -110,7 +110,7 @@ public struct Age: Hashable, Sendable, CustomStringConvertible {
 /// A clean-up the app offers: a preset, or a filter the owner built. Every one is a
 /// `Filter`, which maps onto a selector the CLI already understands.
 public struct Recipe: Identifiable, Hashable, Sendable {
-    public enum Kind: String, Sendable { case oldVideos, cameraPhotos, whatsapp, screenshots, screenRecordings, largeVideos, custom }
+    public enum Kind: String, Sendable { case oldVideos, cameraPhotos, whatsapp, whatsappPhotos, whatsappVideos, screenshots, screenRecordings, largeVideos, custom }
     public let kind: Kind
     public var age: Age?
     public var minBytes: Int64?
@@ -146,6 +146,8 @@ public struct Recipe: Identifiable, Hashable, Sendable {
         case .oldVideos: f.source = "camera"; f.type = "video"
         case .cameraPhotos: f.source = "camera"; f.type = "photo"
         case .whatsapp: f.source = "whatsapp"
+        case .whatsappPhotos: f.source = "whatsapp"; f.type = "photo"
+        case .whatsappVideos: f.source = "whatsapp"; f.type = "video"
         case .screenshots: f.source = "screenshot"
         case .screenRecordings: f.source = "screenrecording"
         case .largeVideos: f.type = "video"; f.minMB = Int((minBytes ?? 0) / Filter.mb)
@@ -159,6 +161,8 @@ public struct Recipe: Identifiable, Hashable, Sendable {
         case .oldVideos: "Old camera videos"
         case .cameraPhotos: "Old camera photos"
         case .whatsapp: "Old WhatsApp media"
+        case .whatsappPhotos: "Old WhatsApp photos"
+        case .whatsappVideos: "Old WhatsApp videos"
         case .screenshots: "Old screenshots"
         case .screenRecordings: "Old screen recordings"
         case .largeVideos: "Large videos"
@@ -170,7 +174,7 @@ public struct Recipe: Identifiable, Hashable, Sendable {
         switch kind {
         case .oldVideos: "Camera videos older than \(age?.words ?? "any age")."
         case .cameraPhotos: "Camera photos older than \(age?.words ?? "any age"). Keeps favourites and your own albums."
-        case .whatsapp: "Older than \(age?.words ?? "any age"). Keeps favourites and your own albums."
+        case .whatsapp, .whatsappPhotos, .whatsappVideos: "Older than \(age?.words ?? "any age"). Keeps favourites and your own albums."
         case .screenshots: "Screenshots older than \(age?.words ?? "any age")."
         case .screenRecordings: "Older than \(age?.words ?? "any age")."
         case .largeVideos: "Any age, bigger than \(Filter.size(Int((minBytes ?? 0) / Filter.mb)))."
@@ -182,7 +186,8 @@ public struct Recipe: Identifiable, Hashable, Sendable {
         switch kind {
         case .oldVideos: "video.fill"
         case .cameraPhotos: "photo.fill"
-        case .whatsapp: "bubble.left.and.bubble.right.fill"
+        case .whatsapp, .whatsappPhotos: "bubble.left.and.bubble.right.fill"
+        case .whatsappVideos: "video.bubble.left.fill"
         case .screenshots: "iphone"
         case .screenRecordings: "record.circle"
         case .largeVideos: "arrow.up.left.and.arrow.down.right"

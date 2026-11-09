@@ -147,6 +147,8 @@ public enum Detector {
         case .oldVideos: return "camera videos" + age
         case .cameraPhotos: return "camera photos" + age
         case .whatsapp: return "WhatsApp items" + age
+        case .whatsappPhotos: return "WhatsApp photos" + age
+        case .whatsappVideos: return "WhatsApp videos" + age
         case .screenshots: return "screenshots" + age
         case .screenRecordings: return "screen recordings" + age
         case .largeVideos: return "large videos"

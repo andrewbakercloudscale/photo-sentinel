@@ -230,7 +230,8 @@ struct AgesCard: View {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
                 ageRow("Camera photos older than", $model.photoAge, .cameraPhotos)
                 ageRow("Camera videos older than", $model.videoAge, .oldVideos)
-                ageRow("WhatsApp older than", $model.whatsappAge, .whatsapp)
+                ageRow("WhatsApp photos older than", $model.whatsappAge, .whatsappPhotos)
+                ageRow("WhatsApp videos older than", $model.whatsappVideoAge, .whatsappVideos)
                 ageRow("Screenshots older than", $model.screenshotAge, .screenshots)
                 ageRow("Screen recordings older than", $model.recordingAge, .screenRecordings)
             }

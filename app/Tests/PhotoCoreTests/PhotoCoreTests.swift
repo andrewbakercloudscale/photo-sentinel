@@ -346,6 +346,22 @@ final class TaskTests: XCTestCase {
         XCTAssertEqual(Recipe(kind: .largeVideos, minBytes: 500 * Filter.mb).selectorArgs, ["--type", "video", "--min-size", "500MB"])
         XCTAssertEqual(Recipe(kind: .whatsapp, age: Age(18, "m")).backups.map(\.type), ["photo", "video"])
     }
+
+    /// WhatsApp photos and videos each have their own age, like the camera's.
+    func testWhatsAppPhotosAndVideosAreSeparate() {
+        XCTAssertEqual(Recipe(kind: .whatsappPhotos, age: Age(2, "y")).selectorArgs,
+                       ["--source", "whatsapp", "--type", "photo", "--older-than", "2y"])
+        XCTAssertEqual(Recipe(kind: .whatsappVideos, age: Age(3, "y")).selectorArgs,
+                       ["--source", "whatsapp", "--type", "video", "--older-than", "3y"])
+        XCTAssertEqual(Recipe(kind: .whatsappVideos, age: Age(3, "y")).backups.map(\.type), ["video"])
+    }
+
+    /// The last 24 months always stay: a younger age is lifted to two years.
+    func testAgesBelowTheFloorAreLifted() {
+        XCTAssertEqual(Age("1y")!.atLeastFloor, Age(2, "y"))
+        XCTAssertEqual(Age("30d")!.atLeastFloor, Age(2, "y"))
+        XCTAssertEqual(Age("3y")!.atLeastFloor, Age(3, "y"))
+    }
 }
 
 final class JobsTests: XCTestCase {

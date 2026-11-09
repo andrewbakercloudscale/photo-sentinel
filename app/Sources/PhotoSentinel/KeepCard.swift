@@ -9,7 +9,7 @@ struct KeepCard: View {
 
     /// Nothing under two years: the last 24 months always stay (owner, 2026-11-09).
     static let ages = ["off", "2y", "3y", "5y"]
-    static let kinds: [Recipe.Kind] = [.cameraPhotos, .oldVideos, .whatsapp, .screenshots, .screenRecordings]
+    static let kinds: [Recipe.Kind] = [.cameraPhotos, .oldVideos, .whatsappPhotos, .whatsappVideos, .screenshots, .screenRecordings]
 
     private func stats(_ kind: Recipe.Kind) -> RecipeStats? { library.recipes.first { $0.recipe.kind == kind } }
 
@@ -20,6 +20,8 @@ struct KeepCard: View {
         case .cameraPhotos: return ch(.camera)?.photos ?? Tally()
         case .oldVideos: return ch(.camera)?.videos ?? Tally()
         case .whatsapp: return ch(.whatsapp)?.total ?? Tally()
+        case .whatsappPhotos: return ch(.whatsapp)?.photos ?? Tally()
+        case .whatsappVideos: return ch(.whatsapp)?.videos ?? Tally()
         case .screenshots: return ch(.screenshot)?.total ?? Tally()
         default: return ch(.screenRecording)?.total ?? Tally()
         }
@@ -30,6 +32,8 @@ struct KeepCard: View {
         case .cameraPhotos: "Camera photos"
         case .oldVideos: "Camera videos"
         case .whatsapp: "WhatsApp"
+        case .whatsappPhotos: "WhatsApp photos"
+        case .whatsappVideos: "WhatsApp videos"
         case .screenshots: "Screenshots"
         default: "Screen recordings"
         }
@@ -38,7 +42,7 @@ struct KeepCard: View {
     private func color(_ kind: Recipe.Kind) -> Color {
         switch kind {
         case .cameraPhotos, .oldVideos: Theme.color(.camera)
-        case .whatsapp: Theme.color(.whatsapp)
+        case .whatsapp, .whatsappPhotos, .whatsappVideos: Theme.color(.whatsapp)
         case .screenshots: Theme.color(.screenshot)
         default: Theme.color(.screenRecording)
         }

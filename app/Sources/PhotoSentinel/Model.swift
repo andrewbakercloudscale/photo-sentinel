@@ -63,7 +63,9 @@ final class Model: ObservableObject {
     /// "off" keeps every item of that type on the phone.
     @AppStorage("age.cameraPhotos") var photoAge = "3y" { willSet { objectWillChange.send() } }
     @AppStorage("age.oldVideos") var videoAge = "2y" { willSet { objectWillChange.send() } }
+    /// WhatsApp photos; the key predates the photo/video split, so a saved age carries over.
     @AppStorage("age.whatsapp") var whatsappAge = "2y" { willSet { objectWillChange.send() } }
+    @AppStorage("age.whatsappVideos") var whatsappVideoAge = "2y" { willSet { objectWillChange.send() } }
     @AppStorage("age.screenshots") var screenshotAge = "2y" { willSet { objectWillChange.send() } }
     @AppStorage("age.screenRecordings") var recordingAge = "2y" { willSet { objectWillChange.send() } }
     @AppStorage("ledgerPath") var ledgerPath = Ledger.defaultPath { willSet { objectWillChange.send() } }
@@ -75,7 +77,7 @@ final class Model: ObservableObject {
     var recipes: [Recipe] {
         // A type set to "off" has no clean-up at all: an age-less recipe would select everything.
         let aged: [Recipe] = [
-            (Recipe.Kind.cameraPhotos, photoAge), (.oldVideos, videoAge), (.whatsapp, whatsappAge),
+            (Recipe.Kind.cameraPhotos, photoAge), (.oldVideos, videoAge), (.whatsappPhotos, whatsappAge), (.whatsappVideos, whatsappVideoAge),
             (.screenshots, screenshotAge), (.screenRecordings, recordingAge),
         ].compactMap { kind, text in Age(text).map { Recipe(kind: kind, age: $0.atLeastFloor) } }
         return aged + [Recipe(kind: .largeVideos, minBytes: 500 * Filter.mb)] + saved.map { Recipe(custom: $0) }
@@ -86,13 +88,14 @@ final class Model: ObservableObject {
         switch kind {
         case .cameraPhotos: $photoAge
         case .oldVideos: $videoAge
-        case .whatsapp: $whatsappAge
+        case .whatsapp, .whatsappPhotos: $whatsappAge
+        case .whatsappVideos: $whatsappVideoAge
         case .screenshots: $screenshotAge
         default: $recordingAge
         }
     }
 
-    var ages: [String] { [photoAge, videoAge, whatsappAge, screenshotAge, recordingAge] }
+    var ages: [String] { [photoAge, videoAge, whatsappAge, whatsappVideoAge, screenshotAge, recordingAge] }
 
     var engine: CLIEngine { CLIEngine(repo: repoPath, ledgerPath: ledgerPath, recipes: recipes) }
 
@@ -107,7 +110,7 @@ final class Model: ObservableObject {
 
     func start() {
         // Saved ages from before the 24-month floor are lifted to it, so the pickers show them.
-        for age in [\Model.photoAge, \.videoAge, \.whatsappAge, \.screenshotAge, \.recordingAge] as [ReferenceWritableKeyPath<Model, String>] {
+        for age in [\Model.photoAge, \.videoAge, \.whatsappAge, \.whatsappVideoAge, \.screenshotAge, \.recordingAge] as [ReferenceWritableKeyPath<Model, String>] {
             if let a = Age(self[keyPath: age]), a.atLeastFloor != a { self[keyPath: age] = a.atLeastFloor.description }
         }
         // The menu bar and footer read the update through this model.
