@@ -75,6 +75,13 @@ public struct Age: Hashable, Sendable, CustomStringConvertible {
         }
     }
 
+    /// The owner's floor (2026-11-09): the last 24 months always stay on the phone.
+    /// Removal refuses anything newer whatever the app asks; this keeps the app honest.
+    public static let onPhoneFloor = Age(2, "y")
+
+    /// This age, or the floor when it is younger.
+    public var atLeastFloor: Age { days < Age.onPhoneFloor.days ? Age.onPhoneFloor : self }
+
     /// The CLI form: "18m".
     public var description: String { "\(amount)\(unit)" }
 

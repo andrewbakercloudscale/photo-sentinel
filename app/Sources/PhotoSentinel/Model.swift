@@ -62,10 +62,10 @@ final class Model: ObservableObject {
     // set onboarded = false and no sheet appeared.
     /// "off" keeps every item of that type on the phone.
     @AppStorage("age.cameraPhotos") var photoAge = "3y" { willSet { objectWillChange.send() } }
-    @AppStorage("age.oldVideos") var videoAge = "1y" { willSet { objectWillChange.send() } }
-    @AppStorage("age.whatsapp") var whatsappAge = "18m" { willSet { objectWillChange.send() } }
-    @AppStorage("age.screenshots") var screenshotAge = "1y" { willSet { objectWillChange.send() } }
-    @AppStorage("age.screenRecordings") var recordingAge = "30d" { willSet { objectWillChange.send() } }
+    @AppStorage("age.oldVideos") var videoAge = "2y" { willSet { objectWillChange.send() } }
+    @AppStorage("age.whatsapp") var whatsappAge = "2y" { willSet { objectWillChange.send() } }
+    @AppStorage("age.screenshots") var screenshotAge = "2y" { willSet { objectWillChange.send() } }
+    @AppStorage("age.screenRecordings") var recordingAge = "2y" { willSet { objectWillChange.send() } }
     @AppStorage("ledgerPath") var ledgerPath = Ledger.defaultPath { willSet { objectWillChange.send() } }
     @AppStorage("repoPath") var repoPath = CLIEngine.defaultRepo { willSet { objectWillChange.send() } }
     @AppStorage("onboarded") var onboarded = false { willSet { objectWillChange.send() } }
@@ -77,7 +77,7 @@ final class Model: ObservableObject {
         let aged: [Recipe] = [
             (Recipe.Kind.cameraPhotos, photoAge), (.oldVideos, videoAge), (.whatsapp, whatsappAge),
             (.screenshots, screenshotAge), (.screenRecordings, recordingAge),
-        ].compactMap { kind, text in Age(text).map { Recipe(kind: kind, age: $0) } }
+        ].compactMap { kind, text in Age(text).map { Recipe(kind: kind, age: $0.atLeastFloor) } }
         return aged + [Recipe(kind: .largeVideos, minBytes: 500 * Filter.mb)] + saved.map { Recipe(custom: $0) }
     }
 
@@ -106,6 +106,10 @@ final class Model: ObservableObject {
     var activeJob: Job? { jobs.first { if case .running = $0.state { return true }; if case .paused = $0.state { return true }; return false } }
 
     func start() {
+        // Saved ages from before the 24-month floor are lifted to it, so the pickers show them.
+        for age in [\Model.photoAge, \.videoAge, \.whatsappAge, \.screenshotAge, \.recordingAge] as [ReferenceWritableKeyPath<Model, String>] {
+            if let a = Age(self[keyPath: age]), a.atLeastFloor != a { self[keyPath: age] = a.atLeastFloor.description }
+        }
         // The menu bar and footer read the update through this model.
         forwarding = updates.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         updates.schedule()

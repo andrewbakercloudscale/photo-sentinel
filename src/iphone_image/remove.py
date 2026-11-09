@@ -34,6 +34,7 @@ import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,7 @@ from .journal import Journal, Op
 from .live import motion_object
 from .logs import get_logger
 from .photos.helper import Helper, HelperError
+from .retention import parse_duration
 from .scanner import scan as run_scan
 from .selector import Selector, channel_of
 
@@ -220,6 +222,29 @@ AUTOMATIC_ALBUMS = frozenset(
 SOURCE_ALBUMS: dict[str, frozenset[str]] = {"whatsapp": frozenset({"WhatsApp"})}
 
 
+def _too_recent(config: Config, asset: dict[str, Any], now: datetime | None = None) -> str | None:
+    """Why this asset is too young to leave the phone, or None when it is old enough.
+
+    The owner's floor (2026-11-09): the last 24 months always stay. An asset
+    whose date cannot be read is kept, because its age cannot be proved.
+    """
+    floor = config.remove_from_iphone.keep_newer_than
+    if floor is None:
+        return "everything is set to stay on the phone"
+    raw = asset.get("created_at_device")
+    try:
+        taken = datetime.fromisoformat(str(raw).replace("Z", "+00:00")) if raw else None
+    except ValueError:
+        taken = None
+    if taken is None:
+        return "no date recorded, so its age cannot be checked"
+    if taken.tzinfo is None:
+        taken = taken.replace(tzinfo=UTC)
+    if taken > (now or datetime.now(UTC)) - floor:
+        return f"newer than {floor.days // 365} years (the last 24 months always stay)"
+    return None
+
+
 def _user_album(config: Config, asset: dict[str, Any]) -> str | None:
     """The first album of the user's own this asset is in, for channels that keep them."""
     channel = channel_of(asset)
@@ -247,6 +272,14 @@ def _candidate_rows(
     # suspected proxies and favourites, neither overridable. SAFETY sections 2
     # and 6.
     selector = selector.for_removal()
+    # The 24-month floor, in the plan as well as the per-asset check below, so
+    # the plan never offers what the check would refuse.
+    floor = config.remove_from_iphone.keep_newer_than
+    if floor is None:
+        return [], selector, False
+    asked = parse_duration(selector.older_than)
+    if asked is None or asked < floor:
+        selector = replace(selector, older_than=f"{floor.days}d")
     # With the remote as evidence, a suspected stand-in is settled by fact rather
     # than by the guess: it goes only if Drive's copy is exactly the size Photos
     # gives for the original. So suspects reach that check instead of being
@@ -398,6 +431,12 @@ def plan(
         album = _user_album(config, asset)
         if album:
             result.block(asset, f"in your album '{album}'")
+            continue
+
+        # 3c. The last 24 months always stay, whatever the plan asked for.
+        recent = _too_recent(config, asset)
+        if recent:
+            result.block(asset, recent)
             continue
 
         # 4. The whole asset group, not just the part that is easy to check.

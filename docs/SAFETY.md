@@ -17,6 +17,13 @@ The core promise, from the specification:
 upload never imply deletion. The user has to change the policy in config AND run
 `remove-from-iphone --apply` before a single byte is removed from the device.
 
+**The last 24 months always stay** (owner, 2026-11-09). `remove_from_iphone.keep_newer_than`
+defaults to `730d` and config refuses anything lower; `never` keeps everything. The removal
+plan raises any `--older-than` below the floor to it, and every asset is checked again before
+it is sent, so no age, filter or recipe can reach a newer item. An asset with no readable date
+is kept. Before this rule, 7,161 items under two years old had been removed (all verified in
+Drive). The app offers no age under two years.
+
 ---
 
 ## 1b. The four-step removal sequence

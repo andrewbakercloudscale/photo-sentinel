@@ -494,7 +494,7 @@ struct ScopeCard: View {
     @State private var gb = ""
 
     private static let gbBytes: Int64 = 1_073_741_824
-    static let ages = ["30d", "90d", "6m", "1y", "18m", "2y", "3y", "5y"].compactMap { Age($0) }
+    static let ages = ["2y", "3y", "5y"].compactMap { Age($0) }
     static let amounts: [(Scope.Amount, String)] =
         [(.all, "All of it")] + [1, 2, 5, 10, 20, 50].map { (.bytes(Int64($0) * gbBytes), "The oldest \($0) GB") }
         + [25, 50, 75].map { (.percent($0), "The oldest \($0)%") }

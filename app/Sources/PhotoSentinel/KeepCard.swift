@@ -7,7 +7,8 @@ struct KeepCard: View {
     @ObservedObject var model: Model
     let library: LibrarySnapshot
 
-    static let ages = ["off", "30d", "90d", "6m", "1y", "18m", "2y", "3y", "5y"]
+    /// Nothing under two years: the last 24 months always stay (owner, 2026-11-09).
+    static let ages = ["off", "2y", "3y", "5y"]
     static let kinds: [Recipe.Kind] = [.cameraPhotos, .oldVideos, .whatsapp, .screenshots, .screenRecordings]
 
     private func stats(_ kind: Recipe.Kind) -> RecipeStats? { library.recipes.first { $0.recipe.kind == kind } }
@@ -91,7 +92,7 @@ struct KeepCard: View {
                 .sectionLabel()
                 ForEach(Self.kinds, id: \.self) { kind in row(kind) }
                 rules
-                Text("Favourites, your own albums and anything not yet checked in \(Backup.name) always stay. Removing shows the exact plan first.")
+                Text("The last 24 months always stay. So do favourites, WhatsApp items in your own albums, and anything not yet checked in \(Backup.name). Removing shows the exact plan first.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
