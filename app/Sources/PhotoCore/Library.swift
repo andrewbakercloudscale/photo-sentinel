@@ -75,12 +75,16 @@ public struct Age: Hashable, Sendable, CustomStringConvertible {
         }
     }
 
-    /// The owner's floor (2026-11-09): the last 24 months always stay on the phone.
-    /// Removal refuses anything newer whatever the app asks; this keeps the app honest.
-    public static let onPhoneFloor = Age(2, "y")
+    /// The engine's last-resort floor: nothing from the last 30 days leaves the phone. The
+    /// 24-month blanket rule (2026-11-09) gave way to per-type ages chosen on My phone, where
+    /// every choice shows what it does (owner, 2026-11-11). Matches `MIN_ON_PHONE` in config.py.
+    public static let onPhoneFloor = Age(1, "m")
 
     /// This age, or the floor when it is younger.
     public var atLeastFloor: Age { days < Age.onPhoneFloor.days ? Age.onPhoneFloor : self }
+
+    /// The ages a keep-on-phone slider stops at, youngest first. Past the last is "keep all".
+    public static let keepStops: [Age] = ["1m", "3m", "6m", "1y", "18m", "2y", "3y", "5y"].compactMap { Age($0) }
 
     /// The CLI form: "18m".
     public var description: String { "\(amount)\(unit)" }
@@ -632,7 +636,79 @@ public enum Fmt {
     }
 }
 
+/// What each keep-on-phone type holds, split at every slider stop, so moving a slider
+/// shows its effect at once without asking the ledger again.
+public struct AgeProfile: Sendable {
+    public struct Part: Hashable, Sendable {
+        public var selected = Tally()
+        public var removableNow = Tally()
+        public var notBackedUp = Tally()
+        public init() {}
+        /// What actually leaves: selected less what a rule keeps (favourites, no hash or Drive path).
+        public var frees: Tally {
+            Tally(count: removableNow.count + notBackedUp.count, bytes: removableNow.bytes + notBackedUp.bytes)
+        }
+        public static func + (a: Part, b: Part) -> Part {
+            var p = Part()
+            p.selected = Tally(count: a.selected.count + b.selected.count, bytes: a.selected.bytes + b.selected.bytes)
+            p.removableNow = Tally(count: a.removableNow.count + b.removableNow.count, bytes: a.removableNow.bytes + b.removableNow.bytes)
+            p.notBackedUp = Tally(count: a.notBackedUp.count + b.notBackedUp.count, bytes: a.notBackedUp.bytes + b.notBackedUp.bytes)
+            return p
+        }
+    }
+
+    public static let kinds: [Recipe.Kind] = [.cameraPhotos, .oldVideos, .whatsappPhotos, .whatsappVideos, .screenshots, .screenRecordings]
+    public let stops: [Age]
+    /// Everything of this type on the phone, at any age.
+    public var onPhone: [Recipe.Kind: Tally] = [:]
+    /// Per type: bucket i holds items older than stops[i] but not older than stops[i + 1].
+    var buckets: [Recipe.Kind: [Int: Part]] = [:]
+
+    public init(stops: [Age] = Age.keepStops) { self.stops = stops }
+
+    /// What an age setting takes off the phone: everything older than it. nil keeps all.
+    /// An age between two stops counts from the next older stop, so it never over-promises.
+    public func leaving(_ kind: Recipe.Kind, _ age: Age?) -> Part {
+        guard let age, let first = stops.firstIndex(where: { $0.days >= age.days }) else { return Part() }
+        return (buckets[kind] ?? [:]).filter { $0.key >= first }.values.reduce(Part(), +)
+    }
+}
+
 extension Ledger {
+    /// One query per type: each on-phone item is put in the bucket of the oldest stop it is
+    /// past. The removable / to-back-up split uses the same rules as `stats`.
+    public static func ageProfile(_ db: SQLiteReader, stops: [Age] = Age.keepStops, now: Date = Date()) throws -> AgeProfile {
+        var p = AgeProfile(stops: stops)
+        let verified = "a.cloud_status = 'CLOUD_VERIFIED'"
+        let keep = "(a.is_favourite = 1 OR COALESCE(a.sha256, '') = '' OR COALESCE(a.cloud_path, '') = '')"
+        // Oldest cutoff first, so an item lands in the oldest stop it is past. Undated: -1, kept.
+        let cases = stops.indices.reversed().map { "WHEN a.created_at_device < ? THEN \($0)" }.joined(separator: " ")
+        let cutoffs: [Any?] = stops.indices.reversed().map { stops[$0].cutoff(now: now) }
+        for kind in AgeProfile.kinds {
+            let (w, args) = Recipe(kind: kind).whereClause(now: now)
+            var on = Tally()
+            var parts: [Int: AgeProfile.Part] = [:]
+            for r in try db.rows("""
+                SELECT CASE \(cases) ELSE -1 END b, COUNT(*), COALESCE(SUM(a.size_bytes), 0),
+                       SUM(\(verified) AND NOT \(keep)), COALESCE(SUM(CASE WHEN \(verified) AND NOT \(keep) THEN a.size_bytes END), 0),
+                       SUM(NOT \(verified)), COALESCE(SUM(CASE WHEN NOT \(verified) THEN a.size_bytes END), 0)
+                FROM assets a WHERE a.present_on_phone = 1 AND \(w) GROUP BY b
+                """, cutoffs + args) {
+                let t = Tally(count: r.int(1), bytes: Int64(r.int(2)))
+                on = add(on, t)
+                guard r.int(0) >= 0 else { continue }
+                var part = AgeProfile.Part()
+                part.selected = t
+                part.removableNow = Tally(count: r.int(3), bytes: Int64(r.int(4)))
+                part.notBackedUp = Tally(count: r.int(5), bytes: Int64(r.int(6)))
+                parts[r.int(0)] = part
+            }
+            p.onPhone[kind] = on
+            p.buckets[kind] = parts
+        }
+        return p
+    }
+
     /// Everything from one source still on the phone with no verified Drive copy, for
     /// sources the backup jobs cannot select by name (Other apps spans many apps).
     /// With `bundle`, only what that one app saved.

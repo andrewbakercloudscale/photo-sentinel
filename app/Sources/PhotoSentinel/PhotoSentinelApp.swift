@@ -122,6 +122,7 @@ struct ContentView: View {
 
     @ViewBuilder private var page: some View {
         switch model.tab {
+        case .phone: MyPhoneView(model: model)
         case .checkup: CheckupView(model: model)
         case .library: LibraryView(model: model)
         case .cleanUp: LibraryView(model: model)

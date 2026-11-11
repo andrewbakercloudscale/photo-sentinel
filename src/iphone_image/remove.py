@@ -225,7 +225,7 @@ SOURCE_ALBUMS: dict[str, frozenset[str]] = {"whatsapp": frozenset({"WhatsApp"})}
 def _too_recent(config: Config, asset: dict[str, Any], now: datetime | None = None) -> str | None:
     """Why this asset is too young to leave the phone, or None when it is old enough.
 
-    The owner's floor (2026-11-09): the last 24 months always stay. An asset
+    The engine's floor: the last 30 days always stay (raise it in config). An asset
     whose date cannot be read is kept, because its age cannot be proved.
     """
     floor = config.remove_from_iphone.keep_newer_than
@@ -241,7 +241,7 @@ def _too_recent(config: Config, asset: dict[str, Any], now: datetime | None = No
     if taken.tzinfo is None:
         taken = taken.replace(tzinfo=UTC)
     if taken > (now or datetime.now(UTC)) - floor:
-        return f"newer than {floor.days // 365} years (the last 24 months always stay)"
+        return f"taken in the last {floor.days} days (they always stay on the phone)"
     return None
 
 
@@ -272,7 +272,7 @@ def _candidate_rows(
     # suspected proxies and favourites, neither overridable. SAFETY sections 2
     # and 6.
     selector = selector.for_removal()
-    # The 24-month floor, in the plan as well as the per-asset check below, so
+    # The floor, in the plan as well as the per-asset check below, so
     # the plan never offers what the check would refuse.
     floor = config.remove_from_iphone.keep_newer_than
     if floor is None:
@@ -433,7 +433,7 @@ def plan(
             result.block(asset, f"in your album '{album}'")
             continue
 
-        # 3c. The last 24 months always stay, whatever the plan asked for.
+        # 3c. The floor (keep_newer_than) always stays, whatever the plan asked for.
         recent = _too_recent(config, asset)
         if recent:
             result.block(asset, recent)

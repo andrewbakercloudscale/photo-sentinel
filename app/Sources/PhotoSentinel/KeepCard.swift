@@ -7,8 +7,8 @@ struct KeepCard: View {
     @ObservedObject var model: Model
     let library: LibrarySnapshot
 
-    /// Nothing under two years: the last 24 months always stay (owner, 2026-11-09).
-    static let ages = ["off", "2y", "3y", "5y"]
+    /// The slider stops on My phone, and "off" (keep all).
+    static let ages = ["off"] + Age.keepStops.map(\.description)
     static let kinds: [Recipe.Kind] = [.cameraPhotos, .oldVideos, .whatsappPhotos, .whatsappVideos, .screenshots, .screenRecordings]
 
     private func stats(_ kind: Recipe.Kind) -> RecipeStats? { library.recipes.first { $0.recipe.kind == kind } }
@@ -96,7 +96,7 @@ struct KeepCard: View {
                 .sectionLabel()
                 ForEach(Self.kinds, id: \.self) { kind in row(kind) }
                 rules
-                Text("The last 24 months always stay. So do favourites, WhatsApp items in your own albums, and anything not yet checked in \(Backup.name). Removing shows the exact plan first.")
+                Text("Ages are set on My phone. The last 30 days always stay, and so do favourites, WhatsApp items in your own albums, and anything not yet checked in \(Backup.name). Removing shows the exact plan first.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -182,11 +182,11 @@ struct KeepCard: View {
                 Text("\(Fmt.bytes(total.bytes)) · \(Fmt.count(total.count)) on phone").font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             .frame(width: 170, alignment: .leading)
-            Picker("", selection: model.ageBinding(kind)) {
-                ForEach(Self.ages, id: \.self) { Text(words($0)).tag($0) }
+            Button { model.tab = .phone } label: {
+                Text(words(model.age(kind))).font(.callout)
             }
-            .labelsHidden().fixedSize().frame(width: 170, alignment: .leading)
-            .help("Keep this much on the phone. Older items can come off once \(Backup.name) has them.")
+            .buttonStyle(.link).frame(width: 170, alignment: .leading)
+            .help("Set on My phone, where each slider shows what it frees.")
             VStack(alignment: .leading, spacing: 3) {
                 StackBar(parts: [(color(kind).opacity(0.35), Double(max(total.bytes - frees, 0))),
                                  (Theme.good, Double(r?.removableNow.bytes ?? 0)), (Theme.warn, Double(r?.notBackedUp.bytes ?? 0))], height: 8)

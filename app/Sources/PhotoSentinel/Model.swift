@@ -12,6 +12,8 @@ final class Model: ObservableObject {
     /// The Library charts: everything on the phone, and what the rule builder selects.
     @Published var everything: Breakdown?
     @Published var selection: Breakdown?
+    /// Each keep-on-phone type split at every slider stop: My phone's live future state.
+    @Published var profile: AgeProfile?
     /// The backup account, its folders and the archive folder, from `config storage`.
     /// Sets `Backup.name` too, so every sentence names the account backups really go to.
     @Published var storage: StorageReport? { didSet { Backup.name = storage?.backupName ?? "Google Drive" } }
@@ -30,7 +32,7 @@ final class Model: ObservableObject {
     @Published var doctorSteps: [(key: String, status: String)] = []
     @Published var doctorStarted = Date()
     @Published var notice: String?
-    @Published var tab: Tab = .checkup
+    @Published var tab: Tab = .phone
     @Published var tasks: [TaskStatus] = []
     @Published var removing: Recipe? { didSet { if removing == nil { planNextIfAny() } } }
     /// A section to scroll to once its tab shows ("builder").
@@ -68,6 +70,11 @@ final class Model: ObservableObject {
     @AppStorage("age.whatsappVideos") var whatsappVideoAge = "2y" { willSet { objectWillChange.send() } }
     @AppStorage("age.screenshots") var screenshotAge = "2y" { willSet { objectWillChange.send() } }
     @AppStorage("age.screenRecordings") var recordingAge = "2y" { willSet { objectWillChange.send() } }
+    /// A group's slider (Camera, WhatsApp); its types follow it unless overridden.
+    @AppStorage("age.group.camera") var cameraGroupAge = "" { willSet { objectWillChange.send() } }
+    @AppStorage("age.group.whatsapp") var whatsappGroupAge = "" { willSet { objectWillChange.send() } }
+    /// Types with their own age instead of their group's, as Recipe.Kind raw values.
+    @AppStorage("age.overrides") var overridesRaw = "" { willSet { objectWillChange.send() } }
     @AppStorage("ledgerPath") var ledgerPath = Ledger.defaultPath { willSet { objectWillChange.send() } }
     @AppStorage("repoPath") var repoPath = CLIEngine.defaultRepo { willSet { objectWillChange.send() } }
     @AppStorage("onboarded") var onboarded = false { willSet { objectWillChange.send() } }
@@ -97,6 +104,64 @@ final class Model: ObservableObject {
 
     var ages: [String] { [photoAge, videoAge, whatsappAge, whatsappVideoAge, screenshotAge, recordingAge] }
 
+    func age(_ kind: Recipe.Kind) -> String { ageBinding(kind).wrappedValue }
+
+    // MARK: Keep groups: one slider per group, a type may set its own age
+
+    private func groupStore(_ g: KeepGroup) -> ReferenceWritableKeyPath<Model, String>? {
+        switch g {
+        case .camera: \.cameraGroupAge
+        case .whatsapp: \.whatsappGroupAge
+        default: nil
+        }
+    }
+
+    /// The group's slider value: its own, or for a one-type group that type's age.
+    func groupAge(_ g: KeepGroup) -> String {
+        if let k = groupStore(g), !self[keyPath: k].isEmpty { return self[keyPath: k] }
+        return age(g.kinds[0])
+    }
+
+    func setGroupAge(_ g: KeepGroup, _ value: String) {
+        if let k = groupStore(g) { self[keyPath: k] = value }
+        for kind in g.kinds where !isOverridden(kind) { ageBinding(kind).wrappedValue = value }
+    }
+
+    private var overrides: Set<String> { Set(overridesRaw.split(separator: ",").map(String.init)) }
+
+    func isOverridden(_ kind: Recipe.Kind) -> Bool { overrides.contains(kind.rawValue) }
+
+    /// A type's own age. In a one-type group that is the group's age.
+    func setAge(_ kind: Recipe.Kind, _ value: String) {
+        guard let g = KeepGroup.of(kind) else { return }
+        if g.kinds.count == 1 { setGroupAge(g, value); return }
+        // Marked even when it matches the group: the slider stays its own until "Follow".
+        giveOwnAge(kind)
+        ageBinding(kind).wrappedValue = value
+    }
+
+    /// Its own slider, starting at the group's age.
+    func giveOwnAge(_ kind: Recipe.Kind) {
+        var o = overrides
+        o.insert(kind.rawValue)
+        overridesRaw = o.sorted().joined(separator: ",")
+    }
+
+    /// Back to following its group.
+    func followGroup(_ kind: Recipe.Kind) {
+        guard let g = KeepGroup.of(kind) else { return }
+        var o = overrides
+        o.remove(kind.rawValue)
+        overridesRaw = o.sorted().joined(separator: ",")
+        ageBinding(kind).wrappedValue = groupAge(g)
+    }
+
+    /// The six ages' clean-ups with their numbers as they stand now, for Apply my plan.
+    func currentPlanSteps() -> [RecipeStats] {
+        guard let db = try? SQLiteReader(path: ledgerPath) else { return [] }
+        return recipes.filter { AgeProfile.kinds.contains($0.kind) }.compactMap { try? Ledger.stats(db, $0) }
+    }
+
     var engine: CLIEngine { CLIEngine(repo: repoPath, ledgerPath: ledgerPath, recipes: recipes) }
 
     var findings: [Finding] {
@@ -109,9 +174,15 @@ final class Model: ObservableObject {
     var activeJob: Job? { jobs.first { if case .running = $0.state { return true }; if case .paused = $0.state { return true }; return false } }
 
     func start() {
-        // Saved ages from before the 24-month floor are lifted to it, so the pickers show them.
+        // Saved ages under the engine's 30-day floor are lifted to it, so the sliders show them.
         for age in [\Model.photoAge, \.videoAge, \.whatsappAge, \.whatsappVideoAge, \.screenshotAge, \.recordingAge] as [ReferenceWritableKeyPath<Model, String>] {
             if let a = Age(self[keyPath: age]), a.atLeastFloor != a { self[keyPath: age] = a.atLeastFloor.description }
+        }
+        // Before groups: the group takes its photos' age, and videos set apart keep theirs.
+        for g in [KeepGroup.camera, .whatsapp] {
+            guard let k = groupStore(g), self[keyPath: k].isEmpty else { continue }
+            self[keyPath: k] = age(g.kinds[0])
+            for kind in g.kinds.dropFirst() where age(kind) != self[keyPath: k] { setAge(kind, age(kind)) }
         }
         // The menu bar and footer read the update through this model.
         forwarding = updates.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
@@ -141,6 +212,7 @@ final class Model: ObservableObject {
             let jobs = engine.jobs()
             let proof = try? Ledger.proof(SQLiteReader(path: engine.ledgerPath), since: "", limit: 0)
             let everything = try? Ledger.breakdown(SQLiteReader(path: engine.ledgerPath))
+            let profile = try? Ledger.ageProfile(SQLiteReader(path: engine.ledgerPath))
             let storage = try? engine.storage()
             let googlePhotos = try? engine.googlePhotos()
             let bin = Model.binSize()
@@ -151,6 +223,7 @@ final class Model: ObservableObject {
                 self.suggestions = suggestions
                 self.binBytes = bin
                 if let everything { self.everything = everything }
+                if let profile { self.profile = profile }
                 if let storage { self.storage = storage }
                 if let googlePhotos { self.googlePhotos = googlePhotos }
                 self.loading = false
@@ -567,6 +640,37 @@ final class Model: ObservableObject {
                 self.refreshDoctor()
             }
         }
+    }
+}
+
+/// A slider on My phone: a source, and the types its age applies to.
+enum KeepGroup: String, CaseIterable, Identifiable {
+    case camera, whatsapp, screenshots, recordings
+    var id: String { rawValue }
+
+    var kinds: [Recipe.Kind] {
+        switch self {
+        case .camera: [.cameraPhotos, .oldVideos]
+        case .whatsapp: [.whatsappPhotos, .whatsappVideos]
+        case .screenshots: [.screenshots]
+        case .recordings: [.screenRecordings]
+        }
+    }
+
+    var channel: Channel {
+        switch self {
+        case .camera: .camera
+        case .whatsapp: .whatsapp
+        case .screenshots: .screenshot
+        case .recordings: .screenRecording
+        }
+    }
+
+    static func of(_ kind: Recipe.Kind) -> KeepGroup? { allCases.first { $0.kinds.contains(kind) } }
+
+    /// "Photos" or "Videos" inside a group.
+    static func part(_ kind: Recipe.Kind) -> String {
+        [.oldVideos, .whatsappVideos].contains(kind) ? "Videos" : "Photos"
     }
 }
 

@@ -17,12 +17,17 @@ The core promise, from the specification:
 upload never imply deletion. The user has to change the policy in config AND run
 `remove-from-iphone --apply` before a single byte is removed from the device.
 
-**The last 24 months always stay** (owner, 2026-11-09). `remove_from_iphone.keep_newer_than`
-defaults to `730d` and config refuses anything lower; `never` keeps everything. The removal
-plan raises any `--older-than` below the floor to it, and every asset is checked again before
-it is sent, so no age, filter or recipe can reach a newer item. An asset with no readable date
-is kept. Before this rule, 7,161 items under two years old had been removed (all verified in
-Drive). The app offers no age under two years.
+**The last 30 days always stay.** `remove_from_iphone.keep_newer_than` defaults to `30d` and
+config refuses anything lower; `never` keeps everything. The removal plan raises any
+`--older-than` below the floor to it, and every asset is checked again before it is sent, so no
+age, filter or recipe can reach a newer item. An asset with no readable date is kept.
+
+How long each type stays beyond that is the owner's choice on the app's **My phone** page: a
+slider per source (Camera, WhatsApp, Screenshots, Screen recordings), photos and videos
+separately if wanted, each showing the storage it frees before anything runs. This replaced a
+blanket two-year floor (2026-11-09 to 2026-11-11), which existed because the ages were set
+without seeing their effect: 7,161 items under two years old had been removed that way (all
+verified in Drive).
 
 ---
 

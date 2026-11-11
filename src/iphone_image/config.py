@@ -71,8 +71,10 @@ Duration = Annotated[
 
 ExpandedPath = Annotated[Path, BeforeValidator(_expand)]
 
-#: The owner's floor: the last two years of media always stay on the phone.
-MIN_ON_PHONE = timedelta(days=730)
+#: The engine's last-resort floor: the last 30 days always stay on the phone.
+#: It was two years (2026-11-09) until the app's My phone page showed, per type,
+#: what every age takes off; the ages chosen there decide the rest (owner, 2026-11-11).
+MIN_ON_PHONE = timedelta(days=30)
 
 
 class Strict(BaseModel):
@@ -328,9 +330,8 @@ class RemoveFromIphoneConfig(Strict):
     keep_user_album_channels: list[str] = Field(default_factory=list)
 
     #: Nothing younger than this ever leaves the phone, whatever any age,
-    #: filter or recipe asks for. The owner's rule (2026-11-09): "keep a
-    #: minimum of 24 months always on the phone". Before it existed, 7,161
-    #: items under two years old were removed. It can be raised, never lowered.
+    #: filter or recipe asks for. It can be raised, never lowered below 30 days.
+    #: The per-type ages are the app's, chosen on My phone with their effect shown.
     keep_newer_than: Duration = MIN_ON_PHONE
 
     @field_validator("keep_newer_than")
@@ -338,8 +339,8 @@ class RemoveFromIphoneConfig(Strict):
     def _floor(cls, value: timedelta | None) -> timedelta | None:
         if value is not None and value < MIN_ON_PHONE:
             raise ValueError(
-                "remove_from_iphone.keep_newer_than cannot be below 2 years (730d): "
-                "the last 24 months always stay on the phone."
+                "remove_from_iphone.keep_newer_than cannot be below 30 days (30d): "
+                "the last 30 days always stay on the phone."
             )
         return value
 

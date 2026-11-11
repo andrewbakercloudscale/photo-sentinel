@@ -15,6 +15,7 @@ enum Snapshot {
         let model = Model()
         model.library = try? model.engine.library()
         model.everything = try? Ledger.breakdown(SQLiteReader(path: model.ledgerPath))
+        model.profile = try? Ledger.ageProfile(SQLiteReader(path: model.ledgerPath))
         model.jobs = model.engine.jobs()
         model.storage = try? model.engine.storage()
         model.doctor = try? model.engine.doctor()
@@ -71,6 +72,7 @@ enum Snapshot {
 
     @ViewBuilder static func page(_ tab: Tab, _ model: Model) -> some View {
         switch tab {
+        case .phone: MyPhoneView(model: model)
         case .checkup: CheckupView(model: model)
         case .library: LibraryView(model: model)
         case .cleanUp: LibraryView(model: model)

@@ -1,7 +1,7 @@
-"""The last 24 months always stay on the phone (owner's rule, 2026-11-09).
+"""The last 30 days always stay on the phone, whatever any age or filter asks.
 
-Before the rule, 7,161 items under two years old were removed because the ages
-in the app allowed it. Now no age, filter or config can reach them.
+The per-type ages above it are chosen on the app's My phone page (2026-11-11),
+which replaced a blanket two-year floor.
 """
 
 from __future__ import annotations
@@ -32,25 +32,26 @@ def _taken(days_ago: int) -> dict:
     return {"created_at_device": (NOW - timedelta(days=days_ago)).strftime("%Y-%m-%dT%H:%M:%SZ")}
 
 
-def test_the_floor_is_two_years_by_default(tmp_path: Path) -> None:
-    assert _config(tmp_path).remove_from_iphone.keep_newer_than == timedelta(days=730)
+def test_the_floor_is_30_days_by_default(tmp_path: Path) -> None:
+    assert _config(tmp_path).remove_from_iphone.keep_newer_than == timedelta(days=30)
 
 
-def test_anything_under_two_years_is_kept(tmp_path: Path) -> None:
+def test_anything_under_30_days_is_kept(tmp_path: Path) -> None:
     config = _config(tmp_path)
-    for days in (0, 30, 365, 540, 729):
+    for days in (0, 1, 15, 29):
         assert _too_recent(config, _taken(days), NOW), days
 
 
-def test_anything_over_two_years_may_go(tmp_path: Path) -> None:
+def test_anything_over_30_days_may_go(tmp_path: Path) -> None:
     config = _config(tmp_path)
-    assert _too_recent(config, _taken(731), NOW) is None
+    assert _too_recent(config, _taken(31), NOW) is None
+    assert _too_recent(config, _taken(180), NOW) is None
     assert _too_recent(config, _taken(3650), NOW) is None
 
 
 def test_the_floor_cannot_be_lowered(tmp_path: Path) -> None:
-    with pytest.raises(ValidationError, match="cannot be below 2 years"):
-        _config(tmp_path, keep_newer_than="1y")
+    with pytest.raises(ValidationError, match="cannot be below 30 days"):
+        _config(tmp_path, keep_newer_than="7d")
 
 
 def test_the_floor_can_be_raised(tmp_path: Path) -> None:

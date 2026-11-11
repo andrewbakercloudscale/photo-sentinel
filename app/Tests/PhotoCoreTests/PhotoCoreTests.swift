@@ -55,6 +55,32 @@ final class LedgerTests: XCTestCase {
         """)
     }
 
+    /// A slider stop takes off exactly what is older than it, split the way removal splits it.
+    func testAgeProfileSplitsAtEachStop() throws {
+        let db = try makeDB()
+        let now = ISO8601DateFormatter().date(from: "2026-11-11T00:00:00Z")!
+        let video = "com.apple.camera"
+        try insert(db, 1, file: "IMG_1.MOV", type: "VIDEO", bundle: video, at: "2026-10-25T00:00:00Z", bytes: 100, cloud: "CLOUD_VERIFIED")
+        try insert(db, 2, file: "IMG_2.MOV", type: "VIDEO", bundle: video, at: "2026-03-01T00:00:00Z", bytes: 200, cloud: "CLOUD_VERIFIED")
+        try insert(db, 3, file: "IMG_3.MOV", type: "VIDEO", bundle: video, at: "2023-01-01T00:00:00Z", bytes: 400)
+        try insert(db, 4, file: "IMG_4.MOV", type: "VIDEO", bundle: video, at: "2020-01-01T00:00:00Z", bytes: 800, fav: 1, cloud: "CLOUD_VERIFIED")
+        try insert(db, 5, file: "IMG_5.JPG", bundle: video, at: "2020-01-01T00:00:00Z", bytes: 5)
+        let p = try Ledger.ageProfile(db, now: now)
+        XCTAssertEqual(p.onPhone[.oldVideos], Tally(count: 4, bytes: 1500))
+        XCTAssertEqual(p.leaving(.oldVideos, Age(1, "m")).selected.bytes, 1400)
+        XCTAssertEqual(p.leaving(.oldVideos, Age(6, "m")).selected.bytes, 1400)
+        XCTAssertEqual(p.leaving(.oldVideos, Age(1, "y")).selected.bytes, 1200)
+        XCTAssertEqual(p.leaving(.oldVideos, Age(5, "y")).selected.bytes, 800)
+        XCTAssertEqual(p.leaving(.oldVideos, nil).selected.bytes, 0)
+        // The favourite is in Drive but stays; item 3 has no Drive copy yet.
+        XCTAssertEqual(p.leaving(.oldVideos, Age(1, "m")).removableNow.bytes, 200)
+        XCTAssertEqual(p.leaving(.oldVideos, Age(1, "m")).notBackedUp.bytes, 400)
+        // Matches the recipe estimate the removal sheet uses.
+        let r = try Ledger.stats(db, Recipe(kind: .oldVideos, age: Age(1, "y")), now: now)
+        XCTAssertEqual(r.selected, p.leaving(.oldVideos, Age(1, "y")).selected)
+        XCTAssertEqual(p.leaving(.cameraPhotos, Age(1, "y")).selected.bytes, 5)
+    }
+
     /// The channel rule must agree with selector.py's channel_of, case by case.
     func testChannelRuleMatchesThePythonSelector() throws {
         let db = try makeDB()
@@ -356,10 +382,10 @@ final class TaskTests: XCTestCase {
         XCTAssertEqual(Recipe(kind: .whatsappVideos, age: Age(3, "y")).backups.map(\.type), ["video"])
     }
 
-    /// The last 24 months always stay: a younger age is lifted to two years.
+    /// The last 30 days always stay: a younger age is lifted to a month.
     func testAgesBelowTheFloorAreLifted() {
-        XCTAssertEqual(Age("1y")!.atLeastFloor, Age(2, "y"))
-        XCTAssertEqual(Age("30d")!.atLeastFloor, Age(2, "y"))
+        XCTAssertEqual(Age("7d")!.atLeastFloor, Age(1, "m"))
+        XCTAssertEqual(Age("6m")!.atLeastFloor, Age(6, "m"))
         XCTAssertEqual(Age("3y")!.atLeastFloor, Age(3, "y"))
     }
 }

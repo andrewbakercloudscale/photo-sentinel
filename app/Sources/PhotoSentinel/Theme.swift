@@ -191,7 +191,7 @@ struct Meter: View {
 }
 
 enum Tab: Int, CaseIterable, Identifiable {
-    case checkup, library, cleanUp, backup, activity, bin, settings
+    case phone, checkup, library, cleanUp, backup, activity, bin, settings
     /// Clean up now lives inside Library; the case stays for its colour.
     static let shown: [Tab] = allCases.filter { $0 != .cleanUp }
     var id: Int { rawValue }
@@ -200,6 +200,7 @@ enum Tab: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .phone: "My phone"
         case .checkup: "Checkup"
         case .library: "Library"
         case .cleanUp: "Clean up"
@@ -212,6 +213,7 @@ enum Tab: Int, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .phone: "iphone.gen3"
         case .checkup: "stethoscope"
         case .library: "chart.bar.xaxis"
         case .cleanUp: "sparkles"
@@ -224,6 +226,7 @@ enum Tab: Int, CaseIterable, Identifiable {
 
     var color: Color {
         switch self {
+        case .phone: Color(light: "#0f766e", dark: "#2dd4bf")
         case .checkup: Color(light: "#db2777", dark: "#f472b6")
         case .library: Color(light: "#4f46e5", dark: "#818cf8")
         case .cleanUp: Color(light: "#c2410c", dark: "#fb923c")

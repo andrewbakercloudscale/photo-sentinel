@@ -11,7 +11,7 @@ struct LibraryView: View {
                 HStack(spacing: 12) {
                     Kpi(label: "ON YOUR IPHONE", value: Fmt.bytes(s.onPhone.bytes), note: "\(Fmt.count(s.onPhone.count)) items")
                     Kpi(label: "SAFE IN GOOGLE DRIVE", value: Fmt.pct(s.coverage), note: "\(Fmt.bytes(s.verified.bytes)) checked", color: Theme.good)
-                    Kpi(label: "YOU COULD FREE", value: Fmt.bytes(s.couldFree), note: "with the ages below", color: Tab.cleanUp.color)
+                    Kpi(label: "YOU COULD FREE", value: Fmt.bytes(s.couldFree), note: "with your ages on My phone", color: Tab.cleanUp.color)
                     Kpi(label: "GROWING", value: "\(Fmt.bytes(s.weeklyGrowth)) / wk", note: "average of the last 3 months", color: Tab.library.color)
                 }
                 MediaCharts(model: model)
@@ -228,12 +228,12 @@ struct AgesCard: View {
     var body: some View {
         Card(title: "Clean-up ages", symbol: "calendar.badge.clock", tint: Tab.cleanUp.color) {
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
-                ageRow("Camera photos older than", $model.photoAge, .cameraPhotos)
-                ageRow("Camera videos older than", $model.videoAge, .oldVideos)
-                ageRow("WhatsApp photos older than", $model.whatsappAge, .whatsappPhotos)
-                ageRow("WhatsApp videos older than", $model.whatsappVideoAge, .whatsappVideos)
-                ageRow("Screenshots older than", $model.screenshotAge, .screenshots)
-                ageRow("Screen recordings older than", $model.recordingAge, .screenRecordings)
+                ageRow("Camera photos older than", .cameraPhotos)
+                ageRow("Camera videos older than", .oldVideos)
+                ageRow("WhatsApp photos older than", .whatsappPhotos)
+                ageRow("WhatsApp videos older than", .whatsappVideos)
+                ageRow("Screenshots older than", .screenshots)
+                ageRow("Screen recordings older than", .screenRecordings)
             }
         }
         .onChange(of: model.ages) { model.refresh() }
@@ -252,10 +252,11 @@ struct AgesCard: View {
         }
     }
 
-    private func ageRow(_ label: String, _ value: Binding<String>, _ kind: Recipe.Kind) -> some View {
+    /// Setting one type here gives it its own age on My phone, apart from its group.
+    private func ageRow(_ label: String, _ kind: Recipe.Kind) -> some View {
         GridRow {
             Text(label)
-            Picker("", selection: value) {
+            Picker("", selection: Binding(get: { model.age(kind) }, set: { model.setAge(kind, $0) })) {
                 ForEach(KeepCard.ages, id: \.self) { Text($0 == "off" ? "never" : Age($0)?.words ?? $0).tag($0) }
             }
             .labelsHidden().frame(width: 140)

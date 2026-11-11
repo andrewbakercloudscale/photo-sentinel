@@ -6,8 +6,10 @@ import SwiftUI
 /// Each line is enforced by the removal engine (src/iphone_image/remove.py, docs/SAFETY.md).
 struct RulesCard: View {
     private static let rules: [(String, String, String)] = [
-        ("calendar.badge.clock", "The last 24 months always stay",
-         "Nothing taken in the last two years leaves the phone, whatever an age, filter or your own rule says."),
+        ("slider.horizontal.3", "Each type keeps what you set on My phone",
+         "Camera, WhatsApp, screenshots and recordings each keep their own age, and photos and videos can differ."),
+        ("calendar.badge.clock", "The last 30 days always stay",
+         "Nothing taken in the last month leaves the phone, whatever an age, filter or your own rule says."),
         ("heart.fill", "Favourites always stay",
          "Tap the heart on anything you want kept on the phone for good."),
         ("rectangle.stack.fill", "WhatsApp items in your own albums stay",
@@ -34,7 +36,7 @@ struct RulesCard: View {
                         }
                     }
                 }
-                Text("These cannot be switched off in the app. The ages per type are set in \"What stays on your phone\".")
+                Text("These cannot be switched off in the app. The ages per type are set on My phone.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
