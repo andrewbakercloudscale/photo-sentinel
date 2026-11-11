@@ -39,7 +39,7 @@ struct StorageCard: View {
                                     showS3 = true
                                 }
                                 .help("Add an Amazon S3 bucket, or an S3 compatible one such as Backblaze B2 or Cloudflare R2, with its access keys.")
-                                CapsuleButton(title: "Other…", symbol: "terminal", color: .secondary, style: .ghost) {
+                                CapsuleButton(title: "Other…", symbol: "terminal", color: .primary, style: .ghost) {
                                     Self.openRcloneConfig()
                                 }
                                 .help("Opens Terminal with rclone's own setup, for any other account. Come back and pick the new account here.")
@@ -160,7 +160,7 @@ struct StorageCard: View {
                 .disabled(signingIn || model.backupBusy || clientId.trimmingCharacters(in: .whitespaces).isEmpty || clientSecret.isEmpty)
                 .help(model.backupBusy ? "Wait for the running backup to finish: signing in again cuts off its uploads." : "")
                 if signingIn { ProgressView().controlSize(.small) }
-                CapsuleButton(title: "Cancel", color: .secondary, style: .ghost) {
+                CapsuleButton(title: "Cancel", color: .primary, style: .ghost) {
                     showOwnClient = false
                     clientSecret = ""
                 }
@@ -210,7 +210,7 @@ struct StorageCard: View {
                 }
                 .disabled(addingS3 || !s3.ready)
                 if addingS3 { ProgressView().controlSize(.small) }
-                CapsuleButton(title: "Cancel", color: .secondary, style: .ghost) {
+                CapsuleButton(title: "Cancel", color: .primary, style: .ghost) {
                     showS3 = false
                     s3 = S3Form()
                 }
@@ -266,7 +266,7 @@ struct StorageCard: View {
                 }
                 .disabled(saving || model.backupBusy)
                 .help(model.backupBusy ? "Wait for the running backup to finish: it uses these settings." : "")
-                CapsuleButton(title: "Cancel", color: .secondary, style: .ghost) { reset(s) }
+                CapsuleButton(title: "Cancel", color: .primary, style: .ghost) { reset(s) }
                 if model.backupBusy { Text("Saving waits until the running backup finishes.").foregroundStyle(.secondary) }
             }
         }

@@ -182,7 +182,7 @@ struct MyPhoneView: View {
             .frame(width: 132, alignment: .leading)
             if own {
                 AgeSlider(value: draft.age(kind), tint: Theme.color(g.channel)) { v in model.keepDraft.setAge(kind, v) }
-                RowButton(title: "Follow \(g.channel.title)", symbol: "arrow.uturn.backward", color: .secondary) { model.keepDraft.followGroup(kind) }
+                RowButton(title: "Follow \(g.channel.title)", symbol: "arrow.uturn.backward", color: .primary) { model.keepDraft.followGroup(kind) }
                     .frame(width: Self.actionWidth, alignment: .trailing)
                     .help("Use the \(g.channel.title) slider above for \(KeepGroup.part(kind).lowercased()) again.")
             } else {
@@ -292,14 +292,14 @@ struct MyPhoneView: View {
                         if let todo, model.removing == nil {
                             RowButton(title: "Next: \(todo.title)…", symbol: "arrow.right.circle.fill", color: Tab.phone.color, style: .fill) { model.planNext() }
                         }
-                        RowButton(title: "Stop", symbol: "xmark", color: .secondary) { model.stopPlan() }
+                        RowButton(title: "Stop", symbol: "xmark", color: .primary) { model.stopPlan() }
                     }
                 }
                 HStack(spacing: 10) {
                     if model.planChanged {
                         RowButton(title: "Save the plan", symbol: "square.and.arrow.down.fill", color: Tab.phone.color, style: .fill) { model.savePlan() }
                             .help("Keeps these ages as your plan. Nothing is backed up or removed.")
-                        RowButton(title: "Discard changes", symbol: "arrow.uturn.backward", color: .secondary) { model.discardPlan() }
+                        RowButton(title: "Discard changes", symbol: "arrow.uturn.backward", color: .primary) { model.discardPlan() }
                     }
                     if going.frees.count > 0 && model.plan.isEmpty {
                         RowButton(title: model.planChanged ? "Save & apply the plan…" : "Apply the plan…", symbol: "checklist",

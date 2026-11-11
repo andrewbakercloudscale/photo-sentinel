@@ -117,7 +117,7 @@ struct KeepCard: View {
             if let next, model.removing == nil {
                 RowButton(title: "Next: \(name(next.kind))…", symbol: "arrow.right.circle.fill", color: Tab.library.color, style: .fill) { model.planNext() }
             }
-            RowButton(title: "Stop", symbol: "xmark", color: .secondary) { model.stopPlan() }
+            RowButton(title: "Stop", symbol: "xmark", color: .primary) { model.stopPlan() }
         }
         .font(.callout)
         .padding(10)

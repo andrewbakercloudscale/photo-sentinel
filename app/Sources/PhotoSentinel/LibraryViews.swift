@@ -305,7 +305,7 @@ struct CoverageRow: View {
                     if state.running {
                         RowButton(title: "Show", symbol: "list.bullet", color: Tab.backup.color) { model.tab = .activity }
                     } else if !state.queued.isEmpty {
-                        RowButton(title: "Cancel", symbol: "xmark", color: .secondary, style: .ghost) {
+                        RowButton(title: "Cancel", symbol: "xmark", color: .primary, style: .ghost) {
                             state.queued.forEach(model.cancelQueued)
                         }
                     } else {
@@ -421,7 +421,7 @@ struct AppBreakdown: View {
 
     @ViewBuilder private func button(_ a: ChannelStats.AppTally) -> some View {
         if let q = model.queue.first(where: { $0.label == Model.appLabel(a) }) {
-            RowButton(title: "Queued", symbol: "xmark", color: .secondary, style: .ghost) { model.cancelQueued(q) }
+            RowButton(title: "Queued", symbol: "xmark", color: .primary, style: .ghost) { model.cancelQueued(q) }
                 .help("Starts when the running backup ends. Click to take it off the queue.")
         } else {
             RowButton(title: "Back up", symbol: "icloud.and.arrow.up", color: Tab.backup.color, style: .soft) {

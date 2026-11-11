@@ -128,7 +128,7 @@ struct GooglePhotosCard: View {
                     message = (true, "Sending. It shows in Activity, and carries on if you close the app.")
                 }
                 .disabled(p.plan.planned == 0 || sending != nil)
-                CapsuleButton(title: "Cancel", color: .secondary, style: .ghost) { pending = nil }
+                CapsuleButton(title: "Cancel", color: .primary, style: .ghost) { pending = nil }
             }
         }
         .font(.callout).fixedSize(horizontal: false, vertical: true)

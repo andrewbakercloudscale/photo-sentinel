@@ -153,6 +153,7 @@ struct CapsuleButton: View {
     var color: Color = Theme.accent
     var style: Style = .fill
     let action: () -> Void
+    @Environment(\.isEnabled) private var enabled
 
     var body: some View {
         Button(action: action) {
@@ -161,11 +162,14 @@ struct CapsuleButton: View {
                 Text(title)
             }
             .font(.callout.weight(.semibold))
-            .foregroundStyle(style == .fill ? Color.white : (style == .ghost ? Color.secondary : color))
+            // Ghost is the quiet one: its colour, no fill. Grey is kept for what is really off.
+            .foregroundStyle(style == .fill ? Color.white : color)
             .padding(.horizontal, 13).padding(.vertical, 6)
             .background(Capsule().fill(style == .fill ? color : (style == .soft ? color.opacity(0.14) : .clear)))
-            .overlay(Capsule().strokeBorder(style == .ghost ? Color.secondary.opacity(0.6) : (style == .soft ? color.opacity(0.5) : .clear), lineWidth: 1.2))
+            .overlay(Capsule().strokeBorder(style == .ghost ? color.opacity(0.55) : (style == .soft ? color.opacity(0.5) : .clear), lineWidth: 1.2))
             .contentShape(Capsule())
+            .opacity(enabled ? 1 : 0.4)
+            .saturation(enabled ? 1 : 0)
         }
         .buttonStyle(.plain)
         // A plain-styled button with a custom label reaches VoiceOver as just "button".
