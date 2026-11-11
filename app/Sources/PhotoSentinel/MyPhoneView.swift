@@ -9,7 +9,7 @@ struct MyPhoneView: View {
     @ObservedObject var model: Model
 
     /// The button column beside a slider, the same width on every row so the sliders line up.
-    private static let actionWidth: CGFloat = 150
+    private static let actionWidth: CGFloat = 136
 
     /// Biggest sources first is the Library's job; here the order is fixed, so a slider
     /// never jumps away from under the pointer as the numbers change.
@@ -60,7 +60,7 @@ struct MyPhoneView: View {
                     trailing: model.loading ? AnyView(ProgressView().controlSize(.small)) : nil) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top, spacing: 12) {
-                    tile("PHOTOS & VIDEOS ON YOUR IPHONE NOW", Fmt.bytes(s.onPhone.bytes), "\(Fmt.count(s.onPhone.count)) items", .primary)
+                    tile("ON YOUR IPHONE NOW", Fmt.bytes(s.onPhone.bytes), "\(Fmt.count(s.onPhone.count)) photos and videos", .primary)
                     Image(systemName: "arrow.right").font(.title2.weight(.bold)).foregroundStyle(.secondary).padding(.top, 26)
                     tile(model.planChanged ? "AFTER THESE SLIDERS (NOT SAVED)" : "AFTER YOUR PLAN", Fmt.bytes(after.bytes),
                          "\(Fmt.count(after.count)) items stay on the phone", Theme.good)
@@ -98,7 +98,8 @@ struct MyPhoneView: View {
                     }
                 }
                 .frame(height: 52)
-                HStack(spacing: 14) {
+                // Wraps onto a second line rather than widening the page past the window.
+                Flow(spacing: 14, lineSpacing: 6) {
                     ForEach(channels) { c in
                         let now = onPhone(s, c).bytes
                         legend(Theme.color(c), "\(c.title) " + (left(c) == now ? Fmt.bytes(now) : "\(Fmt.bytes(now)) → \(Fmt.bytes(left(c)))"))
@@ -141,7 +142,7 @@ struct MyPhoneView: View {
                     Divider().padding(.vertical, 6)
                 }
                 Text("Favourites, WhatsApp items in your own albums and anything from the last 30 days always stay. So does anything not yet checked in \(Backup.name) until it has been backed up. The numbers are an estimate; removing shows the exact list first.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -155,7 +156,7 @@ struct MyPhoneView: View {
                     Text(g.channel.title).font(.callout.weight(.semibold))
                     Text("\(Fmt.bytes(total.bytes)) · \(Fmt.count(total.count)) items").font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
-                .frame(width: 170, alignment: .leading)
+                .frame(width: 150, alignment: .leading)
                 AgeSlider(value: draft.groupAge(g), tint: Theme.color(g.channel)) { v in model.keepDraft.setGroupAge(g, v) }
                 applyButton(g, going)
                     .frame(width: Self.actionWidth, alignment: .trailing)
@@ -178,7 +179,7 @@ struct MyPhoneView: View {
                 Text(KeepGroup.part(kind)).font(.callout)
                 Text("\(Fmt.bytes(total.bytes)) · \(Fmt.count(total.count))").font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-            .frame(width: 152, alignment: .leading)
+            .frame(width: 132, alignment: .leading)
             if own {
                 AgeSlider(value: draft.age(kind), tint: Theme.color(g.channel)) { v in model.keepDraft.setAge(kind, v) }
                 RowButton(title: "Follow \(g.channel.title)", symbol: "arrow.uturn.backward", color: .secondary) { model.keepDraft.followGroup(kind) }
@@ -205,7 +206,7 @@ struct MyPhoneView: View {
                 Text(c.title).font(.callout.weight(.semibold))
                 Text("\(Fmt.bytes(total.bytes)) · \(Fmt.count(total.count)) items").font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
-            .frame(width: 170, alignment: .leading)
+            .frame(width: 150, alignment: .leading)
             Text("Stays. To move some of it, make a rule by app, size, year or place.")
                 .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             RowButton(title: "Make a rule", symbol: "plus.circle.fill", color: Tab.library.color) {
@@ -230,7 +231,7 @@ struct MyPhoneView: View {
             }
         }
         .monospacedDigit()
-        .frame(width: 120, alignment: .trailing)
+        .frame(width: 104, alignment: .trailing)
     }
 
     /// Just this source, now: its backup, then its removal list. Saves the plan first if the
@@ -319,6 +320,48 @@ struct MyPhoneView: View {
     }
 }
 
+/// Lays its children out left to right, starting a new line when the next one would not fit.
+struct Flow: Layout {
+    var spacing: CGFloat = 8
+    var lineSpacing: CGFloat = 6
+
+    private func rows(_ width: CGFloat, _ subviews: Subviews) -> [[(Int, CGSize)]] {
+        var rows: [[(Int, CGSize)]] = [[]]
+        var x: CGFloat = 0
+        for (i, v) in subviews.enumerated() {
+            let size = v.sizeThatFits(.unspecified)
+            if x > 0 && x + size.width > width {
+                rows.append([])
+                x = 0
+            }
+            rows[rows.count - 1].append((i, size))
+            x += size.width + spacing
+        }
+        return rows
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? .infinity
+        let r = rows(width, subviews)
+        let height = r.map { $0.map(\.1.height).max() ?? 0 }.reduce(0, +) + lineSpacing * CGFloat(max(r.count - 1, 0))
+        let used = r.map { row in row.map(\.1.width).reduce(0, +) + spacing * CGFloat(max(row.count - 1, 0)) }.max() ?? 0
+        return CGSize(width: proposal.width ?? used, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in rows(bounds.width, subviews) {
+            var x = bounds.minX
+            let h = row.map(\.1.height).max() ?? 0
+            for (i, size) in row {
+                subviews[i].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += h + lineSpacing
+        }
+    }
+}
+
 /// The rule builder as a floating window: from Make a rule, Add a rule, Edit, or a place's Filter.
 struct RuleSheet: View {
     @ObservedObject var model: Model
@@ -362,9 +405,9 @@ struct AgeSlider: View {
                                   set: { set(Self.value(Int($0.rounded()))) }),
                    in: 0...Double(Self.stops.count), step: 1)
                 .tint(tint)
-                .frame(minWidth: 180)
+                .frame(minWidth: 100)
             Text(Self.words(value)).font(.callout.weight(.semibold)).monospacedDigit()
-                .frame(width: 150, alignment: .leading)
+                .frame(width: 136, alignment: .leading)
         }
         .frame(maxWidth: .infinity)
     }
