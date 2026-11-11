@@ -7,7 +7,6 @@ struct LibraryView: View {
     var body: some View {
         if let s = model.library {
             VStack(alignment: .leading, spacing: 14) {
-                FilterBuilder(model: model).id("builder")
                 HStack(spacing: 12) {
                     Kpi(label: "ON YOUR IPHONE", value: Fmt.bytes(s.onPhone.bytes), note: "\(Fmt.count(s.onPhone.count)) items")
                     Kpi(label: "SAFE IN GOOGLE DRIVE", value: Fmt.pct(s.coverage), note: "\(Fmt.bytes(s.verified.bytes)) checked", color: Theme.good)
@@ -256,7 +255,7 @@ struct AgesCard: View {
     private func ageRow(_ label: String, _ kind: Recipe.Kind) -> some View {
         GridRow {
             Text(label)
-            Picker("", selection: Binding(get: { model.age(kind) }, set: { model.setAge(kind, $0) })) {
+            Picker("", selection: Binding(get: { model.age(kind) }, set: { v in model.editSaved { $0.setAge(kind, v) } })) {
                 ForEach(KeepCard.ages, id: \.self) { Text($0 == "off" ? "never" : Age($0)?.words ?? $0).tag($0) }
             }
             .labelsHidden().frame(width: 140)

@@ -117,6 +117,15 @@ struct ContentView: View {
             OnboardingView(model: model)
         }
         .sheet(item: $model.removing) { r in RemovalSheet(model: model, base: r) }
+        .sheet(isPresented: $model.builderOpen) { RuleSheet(model: model) }
+        // Back up & remove in the rule builder opens the removal sheet: close the builder
+        // first, then hand it over, as one window shows one sheet at a time.
+        .onChange(of: model.removing) {
+            guard model.builderOpen, let r = model.removing else { return }
+            model.removing = nil
+            model.builderOpen = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { model.removing = r }
+        }
         .sheet(item: $model.statDetail) { s in StatDetailSheet(model: model, stat: s) }
     }
 
@@ -136,7 +145,7 @@ struct ContentView: View {
     private var badges: [Tab: Int] {
         let f = model.findings
         let stopped = model.jobs.filter { if case .stopped = $0.state { return true }; return false }.count
-        return [.checkup: f.count, .activity: stopped]
+        return [.phone: model.reviewDue ? 1 : 0, .checkup: f.count, .activity: stopped]
     }
 }
 

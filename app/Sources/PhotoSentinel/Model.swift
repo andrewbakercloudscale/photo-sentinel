@@ -57,6 +57,7 @@ final class Model: ObservableObject {
     @Published var suggestions: [Suggestion] = []
     /// The filter being built on the Library tab.
     @Published var draft = Filter()
+    @Published var builderOpen = false
     /// Clean-ups the owner built and saved.
     @Published var saved: [Filter] = [] { didSet { saveFilters() } }
 
@@ -106,54 +107,67 @@ final class Model: ObservableObject {
 
     func age(_ kind: Recipe.Kind) -> String { ageBinding(kind).wrappedValue }
 
-    // MARK: Keep groups: one slider per group, a type may set its own age
+    // MARK: The keep plan: saved ages, and the draft My phone edits
 
-    private func groupStore(_ g: KeepGroup) -> ReferenceWritableKeyPath<Model, String>? {
-        switch g {
-        case .camera: \.cameraGroupAge
-        case .whatsapp: \.whatsappGroupAge
-        default: nil
+    /// What the clean-ups use: the saved ages, groups and overrides.
+    var savedPlan: KeepPlan {
+        get {
+            var p = KeepPlan()
+            for k in AgeProfile.kinds { p.ages[k] = ageBinding(k).wrappedValue }
+            if !cameraGroupAge.isEmpty { p.groups[.camera] = cameraGroupAge }
+            if !whatsappGroupAge.isEmpty { p.groups[.whatsapp] = whatsappGroupAge }
+            p.overrides = Set(overridesRaw.split(separator: ",").compactMap { Recipe.Kind(rawValue: String($0)) })
+            return p
+        }
+        set {
+            for k in AgeProfile.kinds { if let a = newValue.ages[k] { ageBinding(k).wrappedValue = a } }
+            cameraGroupAge = newValue.groups[.camera] ?? ""
+            whatsappGroupAge = newValue.groups[.whatsapp] ?? ""
+            overridesRaw = newValue.overrides.map(\.rawValue).sorted().joined(separator: ",")
         }
     }
 
-    /// The group's slider value: its own, or for a one-type group that type's age.
-    func groupAge(_ g: KeepGroup) -> String {
-        if let k = groupStore(g), !self[keyPath: k].isEmpty { return self[keyPath: k] }
-        return age(g.kinds[0])
+    /// My phone's sliders. Nothing uses it until Save.
+    @Published var keepDraft = KeepPlan()
+    var planChanged: Bool { keepDraft != savedPlan }
+    @AppStorage("plan.savedAt") var planSavedAt = 0.0 { willSet { objectWillChange.send() } }
+
+    func savePlan() {
+        savedPlan = keepDraft
+        planSavedAt = Date().timeIntervalSince1970
+        refresh()
     }
 
-    func setGroupAge(_ g: KeepGroup, _ value: String) {
-        if let k = groupStore(g) { self[keyPath: k] = value }
-        for kind in g.kinds where !isOverridden(kind) { ageBinding(kind).wrappedValue = value }
+    func discardPlan() { keepDraft = savedPlan }
+
+    /// A saved-age change from elsewhere (Settings): the draft follows unless it has its own edits.
+    func editSaved(_ change: (inout KeepPlan) -> Void) {
+        let clean = !planChanged
+        var p = savedPlan
+        change(&p)
+        savedPlan = p
+        if clean { keepDraft = p }
     }
 
-    private var overrides: Set<String> { Set(overridesRaw.split(separator: ",").map(String.init)) }
-
-    func isOverridden(_ kind: Recipe.Kind) -> Bool { overrides.contains(kind.rawValue) }
-
-    /// A type's own age. In a one-type group that is the group's age.
-    func setAge(_ kind: Recipe.Kind, _ value: String) {
-        guard let g = KeepGroup.of(kind) else { return }
-        if g.kinds.count == 1 { setGroupAge(g, value); return }
-        // Marked even when it matches the group: the slider stays its own until "Follow".
-        giveOwnAge(kind)
-        ageBinding(kind).wrappedValue = value
+    /// When this type's clean-up last finished a removal, from this app.
+    func lastApplied(_ kind: Recipe.Kind) -> Date? {
+        let stored = UserDefaults.standard.double(forKey: "applied." + kind.rawValue)
+        let fromTasks = tasks.filter { $0.task.kind == .remove && $0.task.recipe == kind.rawValue && !$0.running && $0.errorMessage == nil }
+            .map(\.task.startedAt).max()
+        return [stored > 0 ? Date(timeIntervalSince1970: stored) : nil, fromTasks].compactMap { $0 }.max()
     }
 
-    /// Its own slider, starting at the group's age.
-    func giveOwnAge(_ kind: Recipe.Kind) {
-        var o = overrides
-        o.insert(kind.rawValue)
-        overridesRaw = o.sorted().joined(separator: ",")
+    /// Six months after the oldest type that has been applied; nil before any has.
+    var nextReview: Date? {
+        let dates = AgeProfile.kinds.filter { Age(age($0)) != nil }.compactMap(lastApplied)
+        return dates.min().map { $0.addingTimeInterval(182 * 86_400) }
     }
 
-    /// Back to following its group.
-    func followGroup(_ kind: Recipe.Kind) {
-        guard let g = KeepGroup.of(kind) else { return }
-        var o = overrides
-        o.remove(kind.rawValue)
-        overridesRaw = o.sorted().joined(separator: ",")
-        ageBinding(kind).wrappedValue = groupAge(g)
+    var reviewDue: Bool { nextReview.map { $0 <= Date() } ?? false }
+
+    /// Backs up and removes just these types with their saved ages, one sheet at a time.
+    func apply(_ kinds: [Recipe.Kind]) {
+        applyPlan(currentPlanSteps().filter { kinds.contains($0.recipe.kind) })
     }
 
     /// The six ages' clean-ups with their numbers as they stand now, for Apply my plan.
@@ -179,11 +193,13 @@ final class Model: ObservableObject {
             if let a = Age(self[keyPath: age]), a.atLeastFloor != a { self[keyPath: age] = a.atLeastFloor.description }
         }
         // Before groups: the group takes its photos' age, and videos set apart keep theirs.
-        for g in [KeepGroup.camera, .whatsapp] {
-            guard let k = groupStore(g), self[keyPath: k].isEmpty else { continue }
-            self[keyPath: k] = age(g.kinds[0])
-            for kind in g.kinds.dropFirst() where age(kind) != self[keyPath: k] { setAge(kind, age(kind)) }
+        var p = savedPlan
+        for g in [KeepGroup.camera, .whatsapp] where p.groups[g] == nil {
+            p.groups[g] = p.age(g.kinds[0])
+            for kind in g.kinds.dropFirst() where p.age(kind) != p.groups[g] { p.overrides.insert(kind) }
         }
+        savedPlan = p
+        keepDraft = p
         // The menu bar and footer read the update through this model.
         forwarding = updates.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() }
         updates.schedule()
@@ -273,6 +289,9 @@ final class Model: ObservableObject {
         if now != tasks { tasks = now }
         // Something just finished: the ledger has moved.
         let ended = tasks.filter { before.contains($0.task.id) && !$0.running }
+        for t in ended where t.task.kind == .remove && t.errorMessage == nil {
+            if let r = t.task.recipe { UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "applied." + r) }
+        }
         for t in ended where t.task.kind != .places {
             if let e = t.errorMessage { Notify.send("\(t.task.title) failed", e) }
             else { Notify.send("\(t.task.title) finished", "Open Photo Sentinel to see the result.") }
@@ -402,11 +421,8 @@ final class Model: ObservableObject {
         openBuilder()
     }
 
-    /// The filter builder, on the Library tab.
-    func openBuilder() {
-        tab = .library
-        scrollTarget = "builder"
-    }
+    /// The rule builder, floating over whichever tab is showing.
+    func openBuilder() { builderOpen = true }
 
     /// Backs up everything the ages need, then opens each type's removal in turn. Each one
     /// still shows its plan and asks for the typed phrase; nothing is removed without that.
@@ -640,6 +656,43 @@ final class Model: ObservableObject {
                 self.refreshDoctor()
             }
         }
+    }
+}
+
+/// The keep-on-phone ages as one value: per type, per group, and which types set their own.
+struct KeepPlan: Equatable {
+    var ages: [Recipe.Kind: String] = [:]
+    var groups: [KeepGroup: String] = [:]
+    var overrides: Set<Recipe.Kind> = []
+
+    func age(_ kind: Recipe.Kind) -> String { ages[kind] ?? "off" }
+
+    /// The group's slider value: its own, or for a one-type group that type's age.
+    func groupAge(_ g: KeepGroup) -> String { g.kinds.count > 1 ? groups[g] ?? age(g.kinds[0]) : age(g.kinds[0]) }
+
+    func isOverridden(_ kind: Recipe.Kind) -> Bool { overrides.contains(kind) }
+
+    mutating func setGroupAge(_ g: KeepGroup, _ value: String) {
+        if g.kinds.count > 1 { groups[g] = value }
+        for kind in g.kinds where !isOverridden(kind) { ages[kind] = value }
+    }
+
+    /// A type's own age. In a one-type group that is the group's age.
+    mutating func setAge(_ kind: Recipe.Kind, _ value: String) {
+        guard let g = KeepGroup.of(kind) else { return }
+        if g.kinds.count == 1 { setGroupAge(g, value); return }
+        overrides.insert(kind)
+        ages[kind] = value
+    }
+
+    /// Its own slider, starting where it is.
+    mutating func giveOwnAge(_ kind: Recipe.Kind) { overrides.insert(kind) }
+
+    /// Back to following its group.
+    mutating func followGroup(_ kind: Recipe.Kind) {
+        guard let g = KeepGroup.of(kind) else { return }
+        overrides.remove(kind)
+        ages[kind] = groupAge(g)
     }
 }
 

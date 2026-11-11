@@ -167,7 +167,7 @@ struct PlacesCard: View {
                                 }
                             }
                             RowButton(title: "Filter", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country) }
-                                .help("Pick everything taken in \(p.country) in Set your backup rules. Nothing is removed from here.")
+                                .help("Pick everything taken in \(p.country) in a new rule. Nothing is removed from here.")
                         }
                         if open.contains(p.id) {
                             ForEach(p.cities.prefix(15)) { c in
@@ -175,7 +175,7 @@ struct PlacesCard: View {
                                           color: Tab.library.color.opacity(0.55),
                                           note: "    \(Fmt.count(c.total.count)) items · \(Fmt.pct(c.coverage)) in \(Backup.name)") {
                                     RowButton(title: "Filter", symbol: "line.3.horizontal.decrease") { model.showPlace(country: p.country, city: c.city) }
-                                        .help("Pick everything taken in \(c.city) in Set your backup rules. Nothing is removed from here.")
+                                        .help("Pick everything taken in \(c.city) in a new rule. Nothing is removed from here.")
                                 }
                             }
                         }
@@ -204,7 +204,7 @@ struct AppsCard: View {
                             model.draft = Filter(source: a.bundle)
                             model.openBuilder()
                         }
-                        .help("Pick everything \(Fmt.app(a.bundle)) saved in Set your backup rules. Nothing is removed from here.")
+                        .help("Pick everything \(Fmt.app(a.bundle)) saved in a new rule. Nothing is removed from here.")
                     }
                 }
             }

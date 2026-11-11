@@ -16,6 +16,7 @@ enum Snapshot {
         model.library = try? model.engine.library()
         model.everything = try? Ledger.breakdown(SQLiteReader(path: model.ledgerPath))
         model.profile = try? Ledger.ageProfile(SQLiteReader(path: model.ledgerPath))
+        model.keepDraft = model.savedPlan
         model.jobs = model.engine.jobs()
         model.storage = try? model.engine.storage()
         model.doctor = try? model.engine.doctor()

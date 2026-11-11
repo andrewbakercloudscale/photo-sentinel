@@ -32,7 +32,7 @@ struct MediaCharts: View {
             Card(title: "Your selection", symbol: "line.3.horizontal.decrease.circle.fill", tint: Tab.cleanUp.color,
                  trailing: AnyView(share)) {
                 if model.draft.isEmpty {
-                    Label("Pick filters in Set your backup rules and this shows what they select, cut the same ways.",
+                    Label("Make a rule and this shows what it selects, cut the same ways.",
                           systemImage: "hand.point.up.left.fill").font(.callout).foregroundStyle(.secondary)
                 } else if let sel = model.selection, sel.total.count > 0 {
                     VStack(alignment: .leading, spacing: 10) {

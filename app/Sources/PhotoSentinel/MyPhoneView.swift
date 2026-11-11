@@ -2,17 +2,17 @@ import PhotoCore
 import SwiftUI
 
 /// The first page: where the phone's storage goes, a slider per source for how much of it
-/// stays, and what the phone looks like with those choices, live as a slider moves.
-/// The ages are the same ones every clean-up, Checkup and the Library use.
+/// stays, and the phone with those choices, live as a slider moves. The sliders are a draft
+/// until Save the plan; the clean-ups, Checkup and the Library use the saved plan.
+/// Apply one source at a time, or the whole plan, every six months or so.
 struct MyPhoneView: View {
     @ObservedObject var model: Model
-    @State private var refreshing: Task<Void, Never>?
 
-    /// Biggest sources first is the Library's job; here the order is fixed, so a slider
-    /// never jumps away from under the pointer as the numbers change.
     /// The button column beside a slider, the same width on every row so the sliders line up.
     private static let actionWidth: CGFloat = 150
 
+    /// Biggest sources first is the Library's job; here the order is fixed, so a slider
+    /// never jumps away from under the pointer as the numbers change.
     private static let order: [Channel] = [.camera, .whatsapp, .screenshot, .screenRecording, .otherApps, .unattributed]
 
     var body: some View {
@@ -20,23 +20,17 @@ struct MyPhoneView: View {
             VStack(alignment: .leading, spacing: 14) {
                 future(s)
                 sliders(s)
-                next
-            }
-            // The rest of the app (Checkup, Library) catches up once the slider is let go.
-            .onChange(of: model.ages) {
-                refreshing?.cancel()
-                refreshing = Task {
-                    try? await Task.sleep(for: .seconds(1.2))
-                    if !Task.isCancelled { model.refresh() }
-                }
+                planCard
             }
         }
     }
 
+    private var draft: KeepPlan { model.keepDraft }
+
     // MARK: Numbers
 
     private func leaving(_ kind: Recipe.Kind) -> AgeProfile.Part {
-        model.profile?.leaving(kind, Age(model.age(kind))) ?? AgeProfile.Part()
+        model.profile?.leaving(kind, Age(draft.age(kind))) ?? AgeProfile.Part()
     }
 
     private func leaving(_ g: KeepGroup) -> AgeProfile.Part {
@@ -54,65 +48,80 @@ struct MyPhoneView: View {
     // MARK: Today and after
 
     private func future(_ s: LibrarySnapshot) -> some View {
-        let going = leavingAll
-        let after = max(s.onPhone.bytes - going.frees.bytes, 0)
+        let going = leavingAll.frees
+        let after = Tally(count: max(s.onPhone.count - going.count, 0), bytes: max(s.onPhone.bytes - going.bytes, 0))
         let channels = Self.order.filter { onPhone(s, $0).bytes > 0 }
         func left(_ c: Channel) -> Int64 {
             let g = KeepGroup.allCases.first { $0.channel == c }
             return max(onPhone(s, c).bytes - (g.map { leaving($0).frees.bytes } ?? 0), 0)
         }
+        let part = leavingAll
         return Card(title: "Where your iPhone's storage goes", symbol: "internaldrive.fill", tint: Tab.phone.color,
                     trailing: model.loading ? AnyView(ProgressView().controlSize(.small)) : nil) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(Fmt.bytes(s.onPhone.bytes)).font(.system(size: 30, weight: .bold)).monospacedDigit()
-                    Image(systemName: "arrow.right").font(.title3.weight(.bold)).foregroundStyle(.secondary)
-                    Text(Fmt.bytes(after)).font(.system(size: 30, weight: .bold)).foregroundStyle(Theme.good).monospacedDigit()
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("on your iPhone with the choices below").font(.callout)
-                        Text(going.frees.count == 0 ? "Everything stays as it is."
-                             : "Frees \(Fmt.bytes(going.frees.bytes)): \(Fmt.count(going.frees.count)) items go to \(Backup.name).")
-                            .font(.callout.weight(.semibold)).foregroundStyle(going.frees.count == 0 ? Color.secondary : Theme.good)
-                    }
-                    .monospacedDigit()
+                HStack(alignment: .top, spacing: 12) {
+                    tile("PHOTOS & VIDEOS ON YOUR IPHONE NOW", Fmt.bytes(s.onPhone.bytes), "\(Fmt.count(s.onPhone.count)) items", .primary)
+                    Image(systemName: "arrow.right").font(.title2.weight(.bold)).foregroundStyle(.secondary).padding(.top, 26)
+                    tile(model.planChanged ? "AFTER THESE SLIDERS (NOT SAVED)" : "AFTER YOUR PLAN", Fmt.bytes(after.bytes),
+                         "\(Fmt.count(after.count)) items stay on the phone", Theme.good)
+                    tile("MOVES TO \(Backup.name.uppercased())", Fmt.bytes(going.bytes),
+                         going.count == 0 ? "nothing leaves the phone"
+                         : "\(Fmt.count(going.count)) items · \(Fmt.bytes(part.removableNow.bytes)) already there"
+                           + (part.notBackedUp.bytes > 0 ? ", \(Fmt.bytes(part.notBackedUp.bytes)) backed up first" : ""),
+                         Tab.backup.color)
                 }
-                bar("TODAY", channels.map { (Theme.color($0), Double(onPhone(s, $0).bytes)) })
-                bar("AFTER", channels.map { (Theme.color($0), Double(left($0))) } + [(Theme.good.opacity(0.22), Double(going.frees.bytes))])
+                // Both bars on one scale: After is as much shorter as the phone gets emptier.
+                GeometryReader { g in
+                    let width = g.size.width - 56
+                    let scale = s.onPhone.bytes == 0 ? 0 : width / CGFloat(s.onPhone.bytes)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 10) {
+                            Text("TODAY").sectionLabel().frame(width: 46, alignment: .leading)
+                            StackBar(parts: channels.map { (Theme.color($0), Double(onPhone(s, $0).bytes)) }, height: 22)
+                                .frame(width: max(width, 0))
+                        }
+                        HStack(spacing: 10) {
+                            Text("AFTER").sectionLabel().frame(width: 46, alignment: .leading)
+                            HStack(spacing: 0) {
+                                StackBar(parts: channels.map { (Theme.color($0), Double(left($0))) }, height: 22)
+                                    .frame(width: max(CGFloat(after.bytes) * scale, 0))
+                                if going.bytes > 0 {
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .strokeBorder(Theme.good, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                                        .overlay(Text("− \(Fmt.bytes(going.bytes))").font(.caption.weight(.bold)).foregroundStyle(Theme.good).lineLimit(1))
+                                        .frame(width: max(CGFloat(going.bytes) * scale - 4, 0), height: 22)
+                                        .padding(.leading, 4)
+                                }
+                            }
+                            .animation(.easeOut(duration: 0.2), value: after.bytes)
+                        }
+                    }
+                }
+                .frame(height: 52)
                 HStack(spacing: 14) {
                     ForEach(channels) { c in
                         let now = onPhone(s, c).bytes
                         legend(Theme.color(c), "\(c.title) " + (left(c) == now ? Fmt.bytes(now) : "\(Fmt.bytes(now)) → \(Fmt.bytes(left(c)))"))
                     }
-                    if going.frees.bytes > 0 { legend(Theme.good.opacity(0.22), "Freed \(Fmt.bytes(going.frees.bytes))") }
                 }
                 .font(.caption)
-                if going.frees.count > 0 {
-                    HStack(spacing: 14) {
-                        Label("\(Fmt.bytes(going.removableNow.bytes)) is already in \(Backup.name) and can go now", systemImage: "checkmark.icloud.fill")
-                            .foregroundStyle(Theme.good)
-                        if going.notBackedUp.bytes > 0 {
-                            Label("\(Fmt.bytes(going.notBackedUp.bytes)) is backed up first", systemImage: "icloud.and.arrow.up.fill")
-                                .foregroundStyle(Theme.warn)
-                        }
-                    }
-                    .font(.caption.weight(.semibold)).monospacedDigit()
-                }
             }
         }
     }
 
-    private func bar(_ label: String, _ parts: [(Color, Double)]) -> some View {
-        HStack(spacing: 10) {
-            Text(label).sectionLabel().frame(width: 46, alignment: .leading)
-            StackBar(parts: parts, height: 22)
-                .animation(.easeOut(duration: 0.2), value: parts.map(\.1))
+    private func tile(_ label: String, _ value: String, _ note: String, _ color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).sectionLabel().lineLimit(1)
+            Text(value).font(.system(size: 30, weight: .bold)).foregroundStyle(color).monospacedDigit()
+            Text(note).font(.caption).foregroundStyle(.secondary).monospacedDigit()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func legend(_ c: Color, _ text: String) -> some View {
         HStack(spacing: 5) {
             RoundedRectangle(cornerRadius: 3).fill(c).frame(width: 10, height: 10)
-            Text(text).monospacedDigit()
+            Text(text).monospacedDigit().fixedSize()
         }
     }
 
@@ -147,9 +156,10 @@ struct MyPhoneView: View {
                     Text("\(Fmt.bytes(total.bytes)) · \(Fmt.count(total.count)) items").font(.caption).foregroundStyle(.secondary).monospacedDigit()
                 }
                 .frame(width: 170, alignment: .leading)
-                AgeSlider(value: model.groupAge(g), tint: Theme.color(g.channel)) { model.setGroupAge(g, $0) }
-                Color.clear.frame(width: Self.actionWidth, height: 1)
-                frees(going)
+                AgeSlider(value: draft.groupAge(g), tint: Theme.color(g.channel)) { v in model.keepDraft.setGroupAge(g, v) }
+                applyButton(g, going)
+                    .frame(width: Self.actionWidth, alignment: .trailing)
+                frees(going, kinds: g.kinds)
             }
             if g.kinds.count > 1 {
                 ForEach(g.kinds, id: \.self) { kind in kindRow(g, kind) }
@@ -160,7 +170,7 @@ struct MyPhoneView: View {
     /// Photos or videos inside a group: following it, or with an age of its own.
     private func kindRow(_ g: KeepGroup, _ kind: Recipe.Kind) -> some View {
         let total = onPhone(kind)
-        let own = model.isOverridden(kind)
+        let own = draft.isOverridden(kind)
         return HStack(spacing: 12) {
             Image(systemName: KeepGroup.part(kind) == "Videos" ? "video.fill" : "photo.fill")
                 .foregroundStyle(Theme.color(g.channel)).frame(width: 30)
@@ -170,20 +180,20 @@ struct MyPhoneView: View {
             }
             .frame(width: 152, alignment: .leading)
             if own {
-                AgeSlider(value: model.age(kind), tint: Theme.color(g.channel)) { model.setAge(kind, $0) }
-                RowButton(title: "Follow \(g.channel.title)", symbol: "arrow.uturn.backward", color: .secondary) { model.followGroup(kind) }
+                AgeSlider(value: draft.age(kind), tint: Theme.color(g.channel)) { v in model.keepDraft.setAge(kind, v) }
+                RowButton(title: "Follow \(g.channel.title)", symbol: "arrow.uturn.backward", color: .secondary) { model.keepDraft.followGroup(kind) }
                     .frame(width: Self.actionWidth, alignment: .trailing)
                     .help("Use the \(g.channel.title) slider above for \(KeepGroup.part(kind).lowercased()) again.")
             } else {
-                Text("Follows \(g.channel.title): \(AgeSlider.words(model.age(kind)).lowercased())")
+                Text("Follows \(g.channel.title): \(AgeSlider.words(draft.age(kind)).lowercased())")
                     .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
                 RowButton(title: "Set its own", symbol: "slider.horizontal.below.rectangle", color: Theme.color(g.channel)) {
-                    model.giveOwnAge(kind)
+                    model.keepDraft.giveOwnAge(kind)
                 }
                 .frame(width: Self.actionWidth, alignment: .trailing)
                 .help("Give \(g.channel.title) \(KeepGroup.part(kind).lowercased()) a different age, e.g. keep videos for 6 months and photos for 2 years.")
             }
-            frees(leaving(kind))
+            frees(leaving(kind), kinds: [kind])
         }
         .padding(.leading, 18)
     }
@@ -199,20 +209,43 @@ struct MyPhoneView: View {
             Text("Stays. To move some of it, make a rule by app, size, year or place.")
                 .font(.callout).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
             RowButton(title: "Make a rule", symbol: "plus.circle.fill", color: Tab.library.color) {
-                model.draft = Filter()
+                model.draft = Filter(source: c.cliSource)
                 model.openBuilder()
             }
         }
     }
 
-    private func frees(_ p: AgeProfile.Part) -> some View {
-        VStack(alignment: .trailing, spacing: 1) {
-            Text(p.frees.bytes > 0 ? "frees \(Fmt.bytes(p.frees.bytes))" : "frees nothing")
-                .font(.callout.weight(.semibold)).foregroundStyle(p.frees.bytes > 0 ? Theme.good : .secondary)
-            Text(p.frees.count > 0 ? "\(Fmt.count(p.frees.count)) items" : " ").font(.caption).foregroundStyle(.secondary)
+    /// What this row takes off the phone, or why it takes nothing.
+    private func frees(_ p: AgeProfile.Part, kinds: [Recipe.Kind]) -> some View {
+        let keepsAll = kinds.allSatisfy { Age(draft.age($0)) == nil }
+        let applied = kinds.compactMap(model.lastApplied).max()
+        return VStack(alignment: .trailing, spacing: 1) {
+            if p.frees.bytes > 0 {
+                Text("frees \(Fmt.bytes(p.frees.bytes))").font(.callout.weight(.semibold)).foregroundStyle(Theme.good)
+                Text("\(Fmt.count(p.frees.count)) items").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text(keepsAll ? "Keeps everything" : "Already applied").font(.callout.weight(.semibold)).foregroundStyle(.secondary)
+                Text(applied.map { "on " + $0.formatted(.dateTime.day().month(.abbreviated).year()) } ?? " ")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .monospacedDigit()
-        .frame(width: 110, alignment: .trailing)
+        .frame(width: 120, alignment: .trailing)
+    }
+
+    /// Just this source, now: its backup, then its removal list. Saves the plan first if the
+    /// sliders have changed, so what runs is what the page shows.
+    @ViewBuilder private func applyButton(_ g: KeepGroup, _ going: AgeProfile.Part) -> some View {
+        if going.frees.count > 0 && model.plan.isEmpty {
+            RowButton(title: model.planChanged ? "Save & apply…" : "Apply…", symbol: "iphone.and.arrow.forward",
+                      color: Theme.color(g.channel), style: .fill) {
+                if model.planChanged { model.savePlan() }
+                model.apply(g.kinds)
+            }
+            .help("Only \(g.channel.title): backs up what \(Backup.name) doesn't have yet, then shows the exact list. Nothing is removed until you click Delete when the dialog appears.")
+        } else {
+            Color.clear.frame(height: 1)
+        }
     }
 
     private func symbol(_ c: Channel) -> String {
@@ -226,17 +259,34 @@ struct MyPhoneView: View {
         }
     }
 
-    // MARK: Next
+    // MARK: The plan
 
-    private var next: some View {
+    private var planCard: some View {
         let going = leavingAll
-        return Card(title: "Next", symbol: "arrow.right.circle.fill", tint: Tab.phone.color) {
+        let day = Date.FormatStyle().day().month(.abbreviated).year()
+        return Card(title: "Your plan", symbol: "checklist", tint: Tab.phone.color) {
             VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    if model.planChanged {
+                        Label("The sliders have changed since the plan was saved.", systemImage: "pencil.circle.fill").foregroundStyle(Theme.warn)
+                    } else if model.planSavedAt > 0 {
+                        Label("Saved \(Date(timeIntervalSince1970: model.planSavedAt).formatted(day)).", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
+                    } else {
+                        Label("Your plan is the ages above. Move a slider, then save to change it.", systemImage: "checkmark.circle.fill").foregroundStyle(Theme.good)
+                    }
+                    if let next = model.nextReview {
+                        Label(model.reviewDue ? "Time to apply it again." : "Next time to apply it: \(next.formatted(.dateTime.month(.wide).year())).",
+                              systemImage: "calendar.badge.clock")
+                            .foregroundStyle(model.reviewDue ? Theme.warn : .secondary)
+                    }
+                    Spacer()
+                }
+                .font(.callout.weight(.semibold))
                 if !model.plan.isEmpty {
                     let todo = model.plan.first { !model.planDone.contains($0.id) }
                     HStack(spacing: 10) {
                         Image(systemName: "checklist").foregroundStyle(Tab.phone.color)
-                        Text("Applying your plan: \(model.planDone.count) of \(model.plan.count) types done.").font(.callout)
+                        Text("Applying: \(model.planDone.count) of \(model.plan.count) done.").font(.callout)
                         Spacer()
                         if let todo, model.removing == nil {
                             RowButton(title: "Next: \(todo.title)…", symbol: "arrow.right.circle.fill", color: Tab.phone.color, style: .fill) { model.planNext() }
@@ -245,20 +295,44 @@ struct MyPhoneView: View {
                     }
                 }
                 HStack(spacing: 10) {
+                    if model.planChanged {
+                        RowButton(title: "Save the plan", symbol: "square.and.arrow.down.fill", color: Tab.phone.color, style: .fill) { model.savePlan() }
+                            .help("Keeps these ages as your plan. Nothing is backed up or removed.")
+                        RowButton(title: "Discard changes", symbol: "arrow.uturn.backward", color: .secondary) { model.discardPlan() }
+                    }
                     if going.frees.count > 0 && model.plan.isEmpty {
-                        RowButton(title: "Apply my plan…", symbol: "checklist", color: Tab.phone.color, style: .fill) {
+                        RowButton(title: model.planChanged ? "Save & apply the plan…" : "Apply the plan…", symbol: "checklist",
+                                  color: Tab.phone.color, style: model.planChanged ? .soft : .fill) {
+                            if model.planChanged { model.savePlan() }
                             model.applyPlan(model.currentPlanSteps())
                         }
-                        .help("Backs up what \(Backup.name) doesn't have yet, then takes you through each type: the exact list, then you click Delete when the dialog appears.")
+                        .help("Every source in turn: backs up what \(Backup.name) doesn't have yet, then shows each exact list. Nothing is removed until you click Delete when the dialog appears.")
                     }
+                    Spacer()
                     RowButton(title: "See insights", symbol: "stethoscope", color: Tab.checkup.color) { model.tab = .checkup }
                     RowButton(title: "Explore the library", symbol: "chart.bar.xaxis", color: Tab.library.color) { model.tab = .library }
-                    Spacer()
                 }
-                Text("Nothing leaves the phone from this page. Apply my plan shows each list first, and nothing is removed until you click Delete when the dialog appears.")
+                Text("Saving changes nothing on the phone. Apply one source with its own button, or the whole plan; each shows its list first, and nothing is removed until you click Delete when the dialog appears.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// The rule builder as a floating window: from Make a rule, Add a rule, Edit, or a place's Filter.
+struct RuleSheet: View {
+    @ObservedObject var model: Model
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            FilterBuilder(model: model)
+            HStack {
+                Spacer()
+                Button("Done") { model.builderOpen = false }.keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 960)
     }
 }
 
