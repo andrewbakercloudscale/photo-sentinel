@@ -331,6 +331,7 @@ struct WhenBackupsRunCard: View {
     @State private var metered: Bool?
     @State private var pause: Bool?
     @State private var error: String?
+    @State private var batches: (pause: Bool, share: Double, floor: Int64)?
 
     var body: some View {
         Card(title: "When backups run", symbol: "wifi", tint: Tab.backup.color) {
@@ -350,15 +351,46 @@ struct WhenBackupsRunCard: View {
                      ? "Off: backups copy and upload on your iPhone's Personal Hotspot too, which uses its data. A running backup follows the switch within a minute."
                      : "Nothing copies or uploads on your iPhone's Personal Hotspot or any connection macOS marks as metered. Switching to one mid-upload stops the upload at once; it carries on by itself back on normal Wi-Fi. Checks and plans are small and still run.")
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Divider()
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.raised.fill").foregroundStyle(batches?.pause == true ? Theme.warn : Theme.good)
+                    Toggle("Manually verify after each batch", isOn: Binding(get: { batches?.pause ?? false }, set: { saveBatches($0) }))
+                        .toggleStyle(.switch).font(.body.weight(.medium))
+                        .disabled(batches == nil)
+                    Spacer()
+                }
+                Text(batchText).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 if let error { Text(error).font(.callout).foregroundStyle(Theme.bad) }
             }
         }
         .task {
+            let engine0 = model.engine
+            if let b = try? await Task.detached(operation: { try engine0.batches() }).value { batches = b }
             metered = await Self.isMetered()
             let engine = model.engine
             switch await Task.detached(operation: { Result { try engine.pauseOnHotspot() } }).value {
             case .success(let on): pause = on
             case .failure(let e): error = "Could not read the setting: \((e as? JobError)?.text ?? "\(e)")"
+            }
+        }
+    }
+
+    private var batchText: String {
+        guard let b = batches else { return "" }
+        let size = "Each batch is \(Int((b.share * 100).rounded()))% of the Mac's free space at that moment, and never leaves less than \(Fmt.bytes(b.floor)) free."
+        return size + (b.pause
+            ? " On: after each batch is copied, uploaded and checked in \(Backup.name), the backup stops and the Mac copies wait in the Bin. Look it over, empty the Bin, then Resume on Activity for the next batch."
+            : " Off: the next batch starts by itself, and the Bin is emptied when it holds only copies already checked in \(Backup.name).")
+    }
+
+    private func saveBatches(_ on: Bool) {
+        let engine = model.engine
+        let before = batches
+        batches?.pause = on
+        Task {
+            switch await Task.detached(operation: { Result { try engine.batches(pauseAfterEach: on) } }).value {
+            case .success(let saved): batches = saved; error = nil
+            case .failure(let e): batches = before; error = "Not saved: \((e as? JobError)?.text ?? "\(e)")"
             }
         }
     }

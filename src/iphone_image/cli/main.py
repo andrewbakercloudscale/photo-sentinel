@@ -535,6 +535,62 @@ def config_network(ctx: Context, pause_on_hotspot: str | None) -> None:
     ctx.out.result(data, render)
 
 
+@config.command("batches")
+@click.option(
+    "--pause-after-each",
+    type=click.Choice(["on", "off"]),
+    default=None,
+    help="Stop after every backup batch so it can be checked and the Bin emptied by hand.",
+)
+@pass_context
+def config_batches(ctx: Context, pause_after_each: str | None) -> None:
+    """Show how backup batches are sized, or turn the pause after each one on or
+    off. Saved at once; a running job reads it before every batch."""
+    from .. import layout as layout_engine
+
+    c = ctx.config
+    data: dict[str, Any] = {
+        "pauseAfterBatch": c.chunking.pause_after_batch,
+        "shareOfFree": c.chunking.share_of_free,
+        "floorBytes": c.chunking.free_space_floor,
+        "applied": False,
+    }
+    wanted = None if pause_after_each is None else pause_after_each == "on"
+    if wanted is not None and wanted != c.chunking.pause_after_batch:
+        if not c.source_path:
+            _fail(ctx.out, "no configuration file to save to. Run `config init` first.")
+            return
+        path = Path(c.source_path)
+        text = layout_engine.edit_section(path.read_text(), "chunking", {"pause_after_batch": wanted})
+        tmp = path.with_suffix(".yaml.tmp")
+        tmp.write_text(text)
+        try:
+            saved = load_config(tmp)
+        except ConfigError as e:
+            tmp.unlink()
+            _fail(ctx.out, f"not saved, the edited file did not load: {e}")
+            return
+        if saved.chunking.pause_after_batch != wanted:
+            tmp.unlink()
+            _fail(ctx.out, "not saved, the edited file did not say what was asked.")
+            return
+        tmp.replace(path)
+        data.update(pauseAfterBatch=wanted, applied=True)
+
+    def render() -> None:
+        ctx.out.pairs(
+            [
+                ("batch size", f"{data['shareOfFree']:.0%} of free space"),
+                ("always left free", f"{data['floorBytes'] / 1024**3:.0f} GB"),
+                ("pause after each batch", "on" if data["pauseAfterBatch"] else "off"),
+            ]
+        )
+        if data["applied"]:
+            ctx.out.ok("saved. A running job picks it up before its next batch.")
+
+    ctx.out.result(data, render)
+
+
 @config.command("folder-link")
 @click.argument("folder")
 @pass_context

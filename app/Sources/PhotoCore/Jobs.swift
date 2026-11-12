@@ -16,6 +16,9 @@ public struct Job: Identifiable, Hashable, Sendable {
     public let source: String
     public let type: String
     public var state: State
+    /// A batch checked in Google Drive, stopped so the owner can look and empty the Bin.
+    public static let batchDone = "Batch done and checked in Google Drive. The Mac copies are in the Bin: look it over, empty the Bin, then Resume for the next batch."
+    public var waitingForYou: Bool { state == .stopped(Job.batchDone) }
     public var lastLine: String
     public var lastAt: String
     public var leftToFetch: Int?
@@ -277,6 +280,7 @@ public enum Jobs {
     /// What a log message means for the job's state.
     static func state(after m: String, previous: Job.State) -> Job.State {
         if m.contains("nothing left to fetch") || m.hasPrefix("cycle finished") && m.hasSuffix(" 0 still to fetch") { return .finished }
+        if m.contains("WAITING FOR YOU") { return .stopped(Job.batchDone) }
         if m.contains("STOPPING") || m.contains("EMPTY THE BIN") || m.hasPrefix("release failed") || m.hasPrefix("NOT DONE") {
             return .stopped(plain(m))
         }

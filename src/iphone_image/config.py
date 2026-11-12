@@ -380,6 +380,17 @@ class ChunkingConfig(Strict):
     #: Refuse to start a chunk that would take free space below this.
     free_space_floor: SizeBytes = 20 * 1024**3
 
+    #: cycle.sh sizes each batch as this share of the Mac's free space at that
+    #: moment, never going under free_space_floor (owner, 2026-11-12: "half of
+    #: free space"). chunk_bytes still caps a plain `sync` without --budget.
+    share_of_free: float = Field(default=0.5, gt=0, le=1)
+
+    #: cycle.sh stops after each batch is copied, uploaded, checked in Google
+    #: Drive and released to the Bin, and leaves the Bin alone, so the owner can
+    #: look, empty the Bin and resume. Off: the next batch starts at once and the
+    #: Bin is emptied when it holds only released copies.
+    pause_after_batch: bool = False
+
     #: What `sync` fetches when no --type is given. Video is deliberately absent:
     #: it is 83.5 GB from 3% of the items in the library this was built against,
     #: so it must be asked for by name rather than arriving by default.

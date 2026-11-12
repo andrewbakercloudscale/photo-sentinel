@@ -275,6 +275,7 @@ final class Model: ObservableObject {
             case .running: break
             case .finished: Notify.send("\(job.title) backed up", "The backup finished.")
             case .paused(let why): Notify.send("\(job.title) paused", why)
+            case .stopped(let why) where job.waitingForYou: Notify.send("\(job.title): batch done", why)
             case .stopped(let why): Notify.send("\(job.title) stopped", "\(why) Open Photo Sentinel to resume it.")
             }
         }

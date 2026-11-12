@@ -47,13 +47,22 @@ TAG="$SOURCE/$TYPE"
 # drifted: at 25 "GB" (27.0 GB real) it refused a chunk sync would have taken,
 # and the version before that waved through one sync refused. One unit, one
 # source of truth.
-read -r CHUNK_B FLOOR_B <<<"$($PY -c '
+# Each batch is SHARE (per mille) of the free space at that moment, never taking
+# the Mac under the floor (owner, 2026-11-12: half of free space).
+read -r CHUNK_B FLOOR_B SHARE <<<"$($PY -c '
 from iphone_image.config import load_config
 c=load_config()
-print(c.chunking.chunk_bytes, c.chunking.free_space_floor)')"
-NEED_B=$((CHUNK_B + FLOOR_B))
-HEADROOM_B=$((NEED_B + 10 * 1024**3))
+print(c.chunking.chunk_bytes, c.chunking.free_space_floor, round(c.chunking.share_of_free * 1000))')"
 MIN_CHUNK_B=$((500 * 1024**2))
+# The batch free space allows now: SHARE of it, but never past the floor.
+batch_for() {
+  local free=$1 half room
+  half=$((free / 1000 * SHARE))
+  room=$((free - FLOOR_B))
+  [ "$room" -lt "$half" ] && half=$room
+  [ "$half" -lt 0 ] && half=0
+  echo "$half"
+}
 gb() { LC_NUMERIC=C awk -v b="$1" 'BEGIN{printf "%.1f", b/1e9}'; }
 
 # Selector flags shared by every verb, so the log can be read against the plan.
@@ -86,6 +95,12 @@ metered() {
 pause_on_hotspot() {
   [ "$($PY -c 'from iphone_image.config import load_config
 print(load_config().network.pause_on_hotspot)' 2>/dev/null)" != False ]
+}
+# Stop after every batch for the owner to check it and empty the Bin
+# (Settings -> When backups run). Read before every batch, like the hotspot switch.
+pause_after_batch() {
+  [ "$($PY -c 'from iphone_image.config import load_config
+print(load_config().chunking.pause_after_batch)' 2>/dev/null)" = True ]
 }
 wait_off_metered() {
   metered && pause_on_hotspot || return 0
@@ -322,7 +337,7 @@ while pgrep -f 'iphone_image cloud' >/dev/null || pgrep -f 'iphone_image sync' >
 metered_guard & GUARD_PID=$!
 trap 'kill "$GUARD_PID" 2>/dev/null' EXIT
 
-say "starting: $CYCLES cycle(s), $(to_fetch) left to fetch, $(gb "$(free_b)") GB free, a chunk needs $(gb "$NEED_B") GB, release=$RELEASE, empty_bin=$EMPTY_BIN"
+say "starting: $CYCLES cycle(s), $(to_fetch) left to fetch, $(gb "$(free_b)") GB free, each batch is $((SHARE / 10))% of free space above a $(gb "$FLOOR_B") GB floor, release=$RELEASE, empty_bin=$EMPTY_BIN"
 
 prev_left=-1
 stalled=0
@@ -371,31 +386,23 @@ for cycle in $(seq 1 "$CYCLES"); do
     exit 4
   fi
 
-  # 3. The floor, checked here rather than once at the top. Released bytes sit
-  #    in the Bin until it is emptied, so free space falls across a long job
-  #    even though every cycle releases. Empty the Bin when the chunk will not
-  #    fit, but only if everything in it is ours.
+  # 3. The batch size, measured here rather than once at the top: released bytes
+  #    sit in the Bin until it is emptied, so free space falls across a long job.
+  #    Unless the owner checks each batch by hand, empty the Bin first when it
+  #    holds only files this tool released, so the batch is as big as it can be.
+  PAUSING=0; pause_after_batch && PAUSING=1
   now=$(free_b)
-  if [ "$now" -lt "$NEED_B" ] && [ "$EMPTY_BIN" = "1" ]; then
-    say "only $(gb "$now") GB free and a chunk needs $(gb "$NEED_B") GB. Checking the Bin."
+  if [ "$EMPTY_BIN" = "1" ] && [ "$PAUSING" = "0" ] && [ "$(batch_for "$now")" -lt "$CHUNK_B" ]; then
     empty_bin_if_ours || true
     now=$(free_b)
   fi
-  # Short of a full chunk, fetch a smaller one that fits above the floor rather
-  # than stop: the next cycle releases it and tries the full size again.
-  BUDGET=()
-  if [ "$now" -lt "$NEED_B" ]; then
-    room=$((now - FLOOR_B))
-    if [ "$room" -lt "$MIN_CHUNK_B" ]; then
-      say "only $(gb "$now") GB free: not even a $(gb "$MIN_CHUNK_B") GB batch fits above the $(gb "$FLOOR_B") GB floor. EMPTY THE BIN or free disk, then re-run."
-      exit 2
-    fi
-    BUDGET=(--budget "$((room / 1024**2))MB")
-    say "only $(gb "$now") GB free: fetching a smaller batch of $(gb "$room") GB this cycle"
+  batch=$(batch_for "$now")
+  if [ "$batch" -lt "$MIN_CHUNK_B" ]; then
+    say "only $(gb "$now") GB free: not even a $(gb "$MIN_CHUNK_B") GB batch fits above the $(gb "$FLOOR_B") GB floor. EMPTY THE BIN or free disk, then re-run."
+    exit 2
   fi
-  if [ "$now" -lt "$HEADROOM_B" ]; then
-    say "WARNING: $(gb "$now") GB free. The next cycle will need the Bin emptied."
-  fi
+  BUDGET=(--budget "$((batch / 1024**2))MB")
+  say "$(gb "$now") GB free: this batch is up to $(gb "$batch") GB ($((SHARE / 10))% of free space, keeping $(gb "$FLOOR_B") GB free)"
 
   # 4. Fetch the next chunk, then mirror it.
   wait_for_net
@@ -409,6 +416,14 @@ for cycle in $(seq 1 "$CYCLES"); do
   fi
   upload_now
   gphotos_follow
+
+  # 5. Checking each batch by hand: release what Google Drive has verified (it
+  #    goes to the Bin, untouched), then stop. Resume starts the next batch.
+  if [ "$PAUSING" = "1" ] && [ "$(to_fetch)" -gt 0 ]; then
+    do_release
+    say "batch done: copied, uploaded and checked in Google Drive; the Mac copies are in the Bin. WAITING FOR YOU: look it over, empty the Bin, then Resume for the next batch ($(to_fetch) left)."
+    exit 0
+  fi
 done
 
 say "cycle finished: $(gb "$(free_b)") GB free, $(to_fetch) still to fetch"

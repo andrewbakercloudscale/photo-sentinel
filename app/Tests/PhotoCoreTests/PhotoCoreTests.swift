@@ -401,6 +401,12 @@ final class JobsTests: XCTestCase {
       WARNING: an indented line from the CLI, ignored
     """
 
+
+    /// With the pause after each batch on, a checked batch reads as waiting for the owner.
+    func testABatchWaitingForTheOwnerIsSaidPlainly() {
+        let m = "batch done: copied, uploaded and checked in Google Drive; the Mac copies are in the Bin. WAITING FOR YOU: look it over, empty the Bin, then Resume for the next batch (40 left)."
+        XCTAssertEqual(Jobs.state(after: m, previous: .running), .stopped(Job.batchDone))
+    }
     func testReadsStateAndProgressFromTheLog() {
         let jobs = Jobs.read(log: log, processes: [])
         XCTAssertEqual(jobs.map(\.id), ["whatsapp/photo", "screenshot/photo"])

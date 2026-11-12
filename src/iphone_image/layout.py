@@ -41,6 +41,7 @@ KEYS = {
     ),
     "archive": ("local_path",),
     "network": ("pause_on_hotspot",),
+    "chunking": ("pause_after_batch",),
     "google_photos": ("remote", "sources", "album"),
 }
 

@@ -338,6 +338,17 @@ extension CLIEngine {
         return on
     }
 
+    /// How backup batches are sized, and whether each one stops for the owner; with
+    /// `pauseAfterEach`, saves that.
+    public func batches(pauseAfterEach set: Bool? = nil) throws -> (pause: Bool, share: Double, floor: Int64) {
+        var args = ["--json", "config", "batches"]
+        if let set { args += ["--pause-after-each", set ? "on" : "off"] }
+        let obj = try JSONSerialization.jsonObject(with: run(args)) as? [String: Any]
+        if let e = obj?["error"] as? String { throw JobError.message(e) }
+        guard let on = obj?["pauseAfterBatch"] as? Bool else { throw JobError.message("no answer about batches") }
+        return (on, obj?["shareOfFree"] as? Double ?? 0.5, (obj?["floorBytes"] as? NSNumber)?.int64Value ?? 0)
+    }
+
     /// What `refile` would move. Reads the ledger only: seconds.
     public func refilePlan(_ sources: [String]) throws -> RefileReport {
         try decode(RefileReport.self, run(["--json", "refile"] + sources.flatMap { ["--source", $0] }))

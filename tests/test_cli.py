@@ -330,6 +330,20 @@ def test_config_network_turns_the_hotspot_pause_off_and_on(run, config_file: Pat
     assert "pause_on_hotspot: true" in config_file.read_text()
 
 
+def test_config_batches_turns_the_pause_after_each_batch_on_and_off(run, config_file: Path) -> None:
+    shown = json.loads(run("--json", "config", "batches").output)
+    assert shown["pauseAfterBatch"] is False
+    assert shown["shareOfFree"] == 0.5
+    assert shown["floorBytes"] == 20 * 1024**3
+
+    on = json.loads(run("--json", "config", "batches", "--pause-after-each", "on").output)
+    assert on["pauseAfterBatch"] is True and on["applied"] is True
+    assert "pause_after_batch: true" in config_file.read_text()
+
+    off = json.loads(run("--json", "config", "batches", "--pause-after-each", "off").output)
+    assert off["pauseAfterBatch"] is False and off["applied"] is True
+
+
 def test_the_app_sends_the_phrase_the_cli_accepts() -> None:
     """Photo Sentinel's one-step Remove passes CURRENT_PLAN_PHRASE. The two copies of the
     string must agree, or every removal from the app is refused."""
