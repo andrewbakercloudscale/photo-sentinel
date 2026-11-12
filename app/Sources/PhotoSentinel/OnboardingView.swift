@@ -25,14 +25,16 @@ struct OnboardingView: View {
                 default: ScrollView { options }
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 300, alignment: .topLeading)
+            // Fills the space between title and buttons on every step, so the title and the
+            // buttons stay put as the steps change.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             HStack {
                 HStack(spacing: 6) {
                     ForEach(0..<Self.steps, id: \.self) { i in Circle().fill(i == step ? Tab.cleanUp.color : Color.secondary.opacity(0.3)).frame(width: 8, height: 8) }
                 }
                 Spacer()
                 if step > 0 { CapsuleButton(title: "Back", style: .ghost) { step -= 1 } }
-                CapsuleButton(title: step == Self.steps - 1 ? "Start" : "Continue", color: Tab.cleanUp.color) {
+                CapsuleButton(title: step == Self.steps - 1 ? "Start" : "Next", color: Tab.cleanUp.color) {
                     if step == Self.steps - 1 { model.onboarded = true } else { step += 1 }
                 }
             }

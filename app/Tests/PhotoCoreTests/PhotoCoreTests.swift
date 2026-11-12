@@ -657,6 +657,9 @@ final class FilterTests: XCTestCase {
     func testCountsMatchTheCLIOnTheRealLedger() throws {
         guard FileManager.default.fileExists(atPath: Ledger.defaultPath) else { throw XCTSkip("no ledger here") }
         let db = try SQLiteReader(path: Ledger.defaultPath)
+        // The CLI counts the apps config.yaml puts with the camera; so does the app, once told.
+        Channel.withCamera = try CLIEngine().collection()
+        defer { Channel.withCamera = [] }
         let filters = [
             Filter(source: "whatsapp", type: "video", olderThan: "6m", minMB: 20),
             Filter(source: "camera", type: "video", minMB: 1024),
