@@ -344,6 +344,25 @@ def test_config_batches_turns_the_pause_after_each_batch_on_and_off(run, config_
     assert off["pauseAfterBatch"] is False and off["applied"] is True
 
 
+def test_config_collection_counts_airdrop_with_the_camera(run, config_file: Path) -> None:
+    from iphone_image.selector import Selector, channel_of, set_with_camera
+
+    try:
+        assert json.loads(run("--json", "config", "collection").output)["withCamera"] == []
+        added = json.loads(run("--json", "config", "collection", "--add", "com.apple.sharingd").output)
+        assert added == {"withCamera": ["com.apple.sharingd"], "applied": True}
+        assert "with_camera: [com.apple.sharingd]" in config_file.read_text()
+        # The channel rule and the selector both follow it.
+        assert channel_of({"source_bundle_id": "com.apple.sharingd"}) == "camera"
+        clause, params = Selector(source="camera")._source_clause()
+        assert "com.apple.sharingd" in params and "IN (?, ?)" in clause
+        removed = json.loads(run("--json", "config", "collection", "--remove", "com.apple.sharingd").output)
+        assert removed["withCamera"] == []
+        assert channel_of({"source_bundle_id": "com.apple.sharingd"}) == "airdrop"
+    finally:
+        set_with_camera([])
+
+
 def test_the_app_sends_the_phrase_the_cli_accepts() -> None:
     """Photo Sentinel's one-step Remove passes CURRENT_PLAN_PHRASE. The two copies of the
     string must agree, or every removal from the app is refused."""

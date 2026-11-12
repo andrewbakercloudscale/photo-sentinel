@@ -349,6 +349,15 @@ extension CLIEngine {
         return (on, obj?["shareOfFree"] as? Double ?? 0.5, (obj?["floorBytes"] as? NSNumber)?.int64Value ?? 0)
     }
 
+    /// Apps counted with the camera; with `add`/`remove`, saves that.
+    public func collection(add: [String] = [], remove: [String] = []) throws -> [String] {
+        let args = ["--json", "config", "collection"] + add.flatMap { ["--add", $0] } + remove.flatMap { ["--remove", $0] }
+        let obj = try JSONSerialization.jsonObject(with: run(args)) as? [String: Any]
+        if let e = obj?["error"] as? String { throw JobError.message(e) }
+        guard let list = obj?["withCamera"] as? [String] else { throw JobError.message("no answer about the collection") }
+        return list
+    }
+
     /// What `refile` would move. Reads the ledger only: seconds.
     public func refilePlan(_ sources: [String]) throws -> RefileReport {
         try decode(RefileReport.self, run(["--json", "refile"] + sources.flatMap { ["--source", $0] }))

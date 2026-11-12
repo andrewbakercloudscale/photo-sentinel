@@ -96,7 +96,7 @@ def test_unattributed_compiles_to_a_null_check() -> None:
 
 def test_camera_compiles_to_a_bound_bundle_id() -> None:
     sql, params = Selector(source="camera").where()
-    assert "source_bundle_id = ?" in sql
+    assert "source_bundle_id IN (?)" in sql
     assert params == ["com.apple.camera"]
 
 

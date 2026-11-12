@@ -33,9 +33,21 @@ public enum Channel: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    static let sql = """
+    /// Apps whose photos count as the owner's own, with the camera: `collection.with_camera`
+    /// in config.yaml, which selector.py's `channel_of` follows too. Set by the app from
+    /// `config collection` before it reads the ledger.
+    public static var withCamera: [String] {
+        get { lock.lock(); defer { lock.unlock() }; return _withCamera }
+        set { lock.lock(); _withCamera = newValue.filter { $0.allSatisfy { $0.isLetter || $0.isNumber || ".-_".contains($0) } }; lock.unlock() }
+    }
+    nonisolated(unsafe) private static var _withCamera: [String] = []
+    private static let lock = NSLock()
+
+    static var sql: String {
+        let camera = (["com.apple.camera"] + withCamera).map { "'\($0)'" }.joined(separator: ", ")
+        return """
     CASE
-      WHEN a.source_bundle_id = 'com.apple.camera' THEN 'camera'
+      WHEN a.source_bundle_id IN (\(camera)) THEN 'camera'
       WHEN a.source_bundle_id = 'com.apple.springboard' THEN 'screenshot'
       WHEN a.source_bundle_id = 'com.apple.replayd' THEN 'screenRecording'
       WHEN a.source_bundle_id = 'net.whatsapp.WhatsApp' THEN 'whatsapp'
@@ -45,6 +57,7 @@ public enum Channel: String, CaseIterable, Identifiable, Sendable {
       ELSE 'unattributed'
     END
     """
+    }
 }
 
 /// An age such as 18m, written the way the CLI takes it. Units as `retention.py`:

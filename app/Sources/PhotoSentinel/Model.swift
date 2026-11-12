@@ -14,6 +14,8 @@ final class Model: ObservableObject {
     @Published var selection: Breakdown?
     /// Each keep-on-phone type split at every slider stop: My phone's live future state.
     @Published var profile: AgeProfile?
+    /// Apps whose photos count as the owner's own, with the camera (`config collection`).
+    @Published var withCamera: [String] = []
     /// The backup account, its folders and the archive folder, from `config storage`.
     /// Sets `Backup.name` too, so every sentence names the account backups really go to.
     @Published var storage: StorageReport? { didSet { Backup.name = storage?.backupName ?? "Google Drive" } }
@@ -224,6 +226,9 @@ final class Model: ObservableObject {
         loading = true
         let engine = engine
         Task.detached {
+            // Before any ledger read: which apps count with the camera decides the channels.
+            let collection = try? engine.collection()
+            if let collection { Channel.withCamera = collection }
             let result = Result { try engine.library() }
             let jobs = engine.jobs()
             let proof = try? Ledger.proof(SQLiteReader(path: engine.ledgerPath), since: "", limit: 0)
@@ -240,6 +245,7 @@ final class Model: ObservableObject {
                 self.binBytes = bin
                 if let everything { self.everything = everything }
                 if let profile { self.profile = profile }
+                if let collection { self.withCamera = collection }
                 if let storage { self.storage = storage }
                 if let googlePhotos { self.googlePhotos = googlePhotos }
                 self.loading = false
@@ -249,6 +255,20 @@ final class Model: ObservableObject {
                 switch result {
                 case .success(let s): self.library = s; self.error = nil; self.placesIfStale()
                 case .failure(let e): self.error = "Could not read the ledger: \(e)"
+                }
+            }
+        }
+    }
+
+    /// Count an app's photos and videos as your own (with the camera) or as Other apps.
+    func countWithCamera(_ bundle: String, _ on: Bool) {
+        let engine = engine
+        Task.detached {
+            let result = Result { try engine.collection(add: on ? [bundle] : [], remove: on ? [] : [bundle]) }
+            await MainActor.run {
+                switch result {
+                case .success(let list): self.withCamera = list; Channel.withCamera = list; self.refresh()
+                case .failure(let e): self.error = "Could not save that: \(e)"
                 }
             }
         }

@@ -591,6 +591,50 @@ def config_batches(ctx: Context, pause_after_each: str | None) -> None:
     ctx.out.result(data, render)
 
 
+@config.command("collection")
+@click.option("--add", "add", multiple=True, help="Count this app's bundle id as your own photos, with the camera.")
+@click.option("--remove", "remove", multiple=True, help="Back to its own app channel (Other apps).")
+@pass_context
+def config_collection(ctx: Context, add: tuple[str, ...], remove: tuple[str, ...]) -> None:
+    """Show or change which apps' photos and videos count as your own, with the
+    camera: same slider, same Google Drive folders. Saved at once; folders of
+    files already in Google Drive change with `refile`."""
+    from .. import layout as layout_engine
+
+    c = ctx.config
+    current = list(c.collection.with_camera)
+    wanted = [b for b in current if b not in remove] + [b for b in add if b not in current and b not in remove]
+    data: dict[str, Any] = {"withCamera": current, "applied": False}
+    if wanted != current:
+        if not c.source_path:
+            _fail(ctx.out, "no configuration file to save to. Run `config init` first.")
+            return
+        path = Path(c.source_path)
+        text = layout_engine.edit_section(path.read_text(), "collection", {"with_camera": wanted})
+        tmp = path.with_suffix(".yaml.tmp")
+        tmp.write_text(text)
+        try:
+            saved = load_config(tmp)
+        except ConfigError as e:
+            tmp.unlink()
+            _fail(ctx.out, f"not saved, the edited file did not load: {e}")
+            return
+        if saved.collection.with_camera != wanted:
+            tmp.unlink()
+            _fail(ctx.out, "not saved, the edited file did not say what was asked.")
+            return
+        tmp.replace(path)
+        load_config(path)
+        data.update(withCamera=wanted, applied=True)
+
+    def render() -> None:
+        ctx.out.pairs([("counted with the camera", ", ".join(data["withCamera"]) or "camera only")])
+        if data["applied"]:
+            ctx.out.ok("saved. New backups file them with the camera; refile moves ones already in Google Drive.")
+
+    ctx.out.result(data, render)
+
+
 @config.command("folder-link")
 @click.argument("folder")
 @pass_context

@@ -141,6 +141,7 @@ struct MyPhoneView: View {
                     }
                     Divider().padding(.vertical, 6)
                 }
+                yourApps(s)
                 Text("Favourites, WhatsApp items in your own albums and anything from the last 30 days always stay. So does anything not yet checked in \(Backup.name) until it has been backed up. The numbers are an estimate; removing shows the exact list first.")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -213,6 +214,46 @@ struct MyPhoneView: View {
                 model.draft = Filter(source: c.cliSource)
                 model.openBuilder()
             }
+        }
+    }
+
+    /// Apps whose photos may be the owner's own (AirDrop from family, Messages): each one
+    /// counts with the Camera (same slider, same Google Drive folders) or as Other apps.
+    @ViewBuilder private func yourApps(_ s: LibrarySnapshot) -> some View {
+        let skip: Set<String> = ["net.whatsapp.WhatsApp", "com.apple.springboard", "com.apple.replayd"]
+        let shown = s.apps.filter { !skip.contains($0.bundle) }.prefix(6)
+        // AirDrop and Messages are offered even when smaller than the top six: they are where
+        // family photos arrive.
+        let always = ["com.apple.sharingd", "com.apple.MobileSMS"]
+        let extra = (always + model.withCamera).reduce(into: [String]()) { list, b in
+            if !shown.contains(where: { $0.bundle == b }) && !list.contains(b) { list.append(b) }
+        }
+        if !shown.isEmpty || !extra.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("WHICH APPS ARE YOUR OWN PHOTOS AND VIDEOS").sectionLabel()
+                Text("Counted with the Camera, an app's photos follow the Camera slider and go to the Camera folders in \(Backup.name).")
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                    ForEach(Array(shown), id: \.bundle) { a in appChoice(a.bundle, a.tally) }
+                    ForEach(extra, id: \.self) { b in appChoice(b, nil) }
+                }
+            }
+            .padding(.bottom, 8)
+        }
+    }
+
+    private func appChoice(_ bundle: String, _ t: Tally?) -> some View {
+        GridRow {
+            Text(Fmt.app(bundle)).fontWeight(.medium).lineLimit(1)
+            Text(t.map { "\(Fmt.bytes($0.bytes)) · \(Fmt.count($0.count))" } ?? "").font(.caption)
+                .foregroundStyle(.secondary).monospacedDigit().gridColumnAlignment(.trailing)
+            Picker("", selection: Binding(
+                get: { model.withCamera.contains(bundle) },
+                set: { model.countWithCamera(bundle, $0) })) {
+                Text("With Camera").tag(true)
+                Text("Other apps").tag(false)
+            }
+            .pickerStyle(.segmented).labelsHidden().frame(width: 210)
         }
     }
 

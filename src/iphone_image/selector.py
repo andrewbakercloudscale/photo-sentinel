@@ -57,6 +57,23 @@ CAMERA_BY_FILENAME = (
     "AND COALESCE(a.subtypes, '') NOT LIKE '%screenshot%'"
 )
 
+#: Apps the owner counts as their own photos and videos (owner, 2026-11-12:
+#: "I airdrop with my daughter... I view these as part of my collection"). Their
+#: items are the camera channel everywhere: folders, selectors, sliders. Set from
+#: `collection.with_camera` when the config loads (`set_with_camera`), because the
+#: channel rule is called from places that never see the config.
+_WITH_CAMERA: frozenset[str] = frozenset()
+
+
+def set_with_camera(bundles: list[str] | frozenset[str]) -> None:
+    global _WITH_CAMERA
+    _WITH_CAMERA = frozenset(bundles)
+
+
+def with_camera() -> frozenset[str]:
+    return _WITH_CAMERA
+
+
 #: Bundle id back to the friendly name. Derived from CHANNELS rather than
 #: written out again, so the two directions cannot drift apart.
 BY_BUNDLE_ID: dict[str, str] = {
@@ -77,6 +94,8 @@ def channel_of(asset: dict[str, Any]) -> str:
     rather than trusting this comment.
     """
     bundle = asset.get("source_bundle_id")
+    if bundle and bundle in _WITH_CAMERA:
+        return "camera"
     if bundle:
         # An app we have no friendly name for keeps its bundle id, which is
         # still a working selector: `--source com.example.app`.
@@ -312,10 +331,12 @@ class Selector:
         """
         assert self.source is not None
         if self.source.strip().lower() == "camera":
+            bundles = ["com.apple.camera", *sorted(_WITH_CAMERA - {"com.apple.camera"})]
+            marks = ", ".join("?" for _ in bundles)
             return (
-                f"(a.source_bundle_id = ? OR (a.source_bundle_id IS NULL "
+                f"(a.source_bundle_id IN ({marks}) OR (a.source_bundle_id IS NULL "
                 f"AND {CAMERA_BY_FILENAME}))",
-                ["com.apple.camera"],
+                bundles,
             )
         bundle = resolve_channel(self.source)
         if bundle is None:

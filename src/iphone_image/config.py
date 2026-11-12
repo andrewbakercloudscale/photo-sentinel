@@ -434,6 +434,13 @@ class NetworkConfig(Strict):
     pause_on_hotspot: bool = True
 
 
+class CollectionConfig(Strict):
+    #: Apps whose photos and videos count as the owner's own, with the camera:
+    #: same slider, same Google Drive folders, `--source camera` selects them.
+    #: Bundle ids, e.g. com.apple.sharingd (AirDrop), com.apple.MobileSMS (Messages).
+    with_camera: list[str] = Field(default_factory=list)
+
+
 class GooglePhotosConfig(Strict):
     """An extra copy in Google Photos, for looking at. Never a backup.
 
@@ -501,6 +508,7 @@ class Config(Strict):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     performance: PerformanceConfig = Field(default_factory=PerformanceConfig)
     network: NetworkConfig = Field(default_factory=NetworkConfig)
+    collection: CollectionConfig = Field(default_factory=CollectionConfig)
     google_photos: GooglePhotosConfig = Field(default_factory=GooglePhotosConfig)
 
     #: Where this config was loaded from. None means built-in defaults.
@@ -590,6 +598,9 @@ def load_config(path: Path | None = None, *, required: bool = False) -> Config:
     if not target.exists():
         if required or path is not None:
             raise ConfigError(f"No configuration file at {target}")
+        from .selector import set_with_camera
+
+        set_with_camera([])
         return Config()
 
     try:
@@ -606,4 +617,7 @@ def load_config(path: Path | None = None, *, required: bool = False) -> Config:
         raise ConfigError(f"{target} is not valid:\n{_describe(exc)}") from exc
 
     config.source_path = target
+    from .selector import set_with_camera
+
+    set_with_camera(config.collection.with_camera)
     return config
